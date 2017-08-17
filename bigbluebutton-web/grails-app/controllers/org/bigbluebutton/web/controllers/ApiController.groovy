@@ -2087,7 +2087,6 @@ class ApiController {
     requestBody = StringUtils.isEmpty(requestBody) ? null : requestBody;
 
     if (requestBody == null) {
-      StringUtils.isEmpty(params.coursename
               downloadAndProcessDocument(presentationService.defaultUploadedPresentation, conf.getInternalId());
     } else {
       log.debug "Request body: \n" + requestBody;
