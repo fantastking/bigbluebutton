@@ -168,7 +168,10 @@ class ApiController {
 
     if (meetingService.createMeeting(newMeeting)) {
       // See if the request came with pre-uploading of presentation.
-      uploadDocuments(newMeeting);
+
+      String coursename=params.coursename;
+      uploadDocumentsEx(newMeeting,coursename);
+     // uploadDocuments(newMeeting);
       respondWithConference(newMeeting, null, null)
     } else {
       // Translate the external meeting id into an internal meeting id.
@@ -2040,6 +2043,43 @@ class ApiController {
      }
    }
 
+  def uploadDocumentsEx(conf,coursename) {
+    log.debug("ApiController#uploadDocuments(${conf.getInternalId()})");
+
+    String requestBody = request.inputStream == null ? null : request.inputStream.text;
+    requestBody = StringUtils.isEmpty(requestBody) ? null : requestBody;
+
+    if (requestBody == null) {
+     if( StringUtils.isEmpty(coursename))
+      {
+        downloadAndProcessDocument(presentationService.defaultUploadedPresentation, conf.getInternalId());
+      }else
+      {
+        downloadAndProcessDocument(presentationService.defaultCourseDir+ File.separatorChar+coursename, conf.getInternalId());
+      }
+    } else {
+      log.debug "Request body: \n" + requestBody;
+      def xml = new XmlSlurper().parseText(requestBody);
+      xml.children().each { module ->
+        log.debug("module config found: [${module.@name}]");
+
+        if ("presentation".equals(module.@name.toString())) {
+          // need to iterate over presentation files and process them
+          module.children().each { document ->
+            if (!StringUtils.isEmpty(document.@url.toString())) {
+              downloadAndProcessDocument(document.@url.toString(), conf.getInternalId());
+            } else if (!StringUtils.isEmpty(document.@name.toString())) {
+              def b64 = new Base64()
+              def decodedBytes = b64.decode(document.text().getBytes())
+              processDocumentFromRawBytes(decodedBytes, document.@name.toString(), conf.getInternalId());
+            } else {
+              log.debug("presentation module config found, but it did not contain url or name attributes");
+            }
+          }
+        }
+      }
+    }
+  }
   def uploadDocuments(conf) {
     log.debug("ApiController#uploadDocuments(${conf.getInternalId()})");
 
@@ -2047,7 +2087,8 @@ class ApiController {
     requestBody = StringUtils.isEmpty(requestBody) ? null : requestBody;
 
     if (requestBody == null) {
-      downloadAndProcessDocument(presentationService.defaultUploadedPresentation, conf.getInternalId());
+      StringUtils.isEmpty(params.coursename
+              downloadAndProcessDocument(presentationService.defaultUploadedPresentation, conf.getInternalId());
     } else {
       log.debug "Request body: \n" + requestBody;
       def xml = new XmlSlurper().parseText(requestBody);
