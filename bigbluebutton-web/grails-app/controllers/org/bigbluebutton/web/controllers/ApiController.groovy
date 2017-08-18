@@ -2055,7 +2055,8 @@ class ApiController {
         downloadAndProcessDocument(presentationService.defaultUploadedPresentation, conf.getInternalId());
       }else
       {
-        downloadAndProcessDocument(presentationService.defaultCourseDir+ File.separatorChar+coursename, conf.getInternalId());
+
+        downloadAndProcessDocument(String.format(presentationService.defaultCourseDir,coursename), conf.getInternalId());
       }
     } else {
       log.debug "Request body: \n" + requestBody;
