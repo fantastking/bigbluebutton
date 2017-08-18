@@ -639,7 +639,7 @@ public class ParamsProcessorUtil {
 
 		if (cs == null || cs.equals(checksum) == false) {
 			log.info("query string after checksum removed: [{}]", queryString);
-			log.info("checksumError: query string checksum failed. our: [{}], client: [{}]", cs, checksum);
+			log.info("checksumError: query string checksum failed. our: [{}], client: [{}]-[{}]", cs, checksum,securitySalt);
 			return false;
 		}
 
