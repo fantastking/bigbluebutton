@@ -17,19 +17,17 @@ const getClosedCaptionLocales = () => {
 const getUserRoles = () => {
   const user = Users.findOne({
     userId: Auth.userID,
-  }).user;
+  });
 
   return user.role;
 };
 
 const updateSettings = (obj) => {
-  Object.keys(obj).forEach(k => Settings[k] = obj[k]);
+  Object.keys(obj).forEach(k => (Settings[k] = obj[k]));
   Settings.save();
 };
 
-const getAvailableLocales = function () {
-  return fetch('/html5client/locales').then(locales => locales.json());
-};
+const getAvailableLocales = () => fetch('/html5client/locales').then(locales => locales.json());
 
 export {
   getClosedCaptionLocales,

@@ -23,7 +23,6 @@ package org.bigbluebutton.main.model.users
   
   import org.as3commons.logging.api.ILogger;
   import org.as3commons.logging.api.getClassLogger;
-
   import org.bigbluebutton.core.UsersUtil;
 
   public class AutoReconnect
@@ -36,7 +35,6 @@ package org.bigbluebutton.main.model.users
     private var _attempt:Number;
 
     public function onDisconnect(callback:Function, parameters:Array):void {
-      LOGGER.debug("onDisconnect, parameters={0}", [parameters.toString()]);
       _reconnectCallback = callback;
       _reconnectParameters = parameters;
       _attempt = 0;
@@ -47,17 +45,16 @@ package org.bigbluebutton.main.model.users
       var logData:Object = UsersUtil.initLogData();
       logData.attemptNum = _attempt;
       logData.tags = ["connection"];
-      logData.message = "onConnectionAttemptFailed";
+      logData.logCode = "connection_attempt_failed";
       LOGGER.warn(JSON.stringify(logData));
       attemptReconnect(_backoff);
     }
 
     private function attemptReconnect(backoff:Number):void {
       _attempt++;
-      LOGGER.debug("attemptReconnect backoff={0}, attempt={1}", [backoff, _attempt]);
+
       var retryTimer:Timer = new Timer(backoff, 1);
       retryTimer.addEventListener(TimerEvent.TIMER, function():void {
-        LOGGER.debug("Reconnecting");
         _reconnectCallback.apply(null, _reconnectParameters);
       });
       retryTimer.start();

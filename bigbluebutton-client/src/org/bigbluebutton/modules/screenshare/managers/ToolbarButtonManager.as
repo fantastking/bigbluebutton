@@ -20,13 +20,14 @@
 package org.bigbluebutton.modules.screenshare.managers
 {
 	import com.asfusion.mate.events.Dispatcher;
+	
 	import org.as3commons.logging.api.ILogger;
 	import org.as3commons.logging.api.getClassLogger;
 	import org.bigbluebutton.common.events.ToolbarButtonEvent;
 	import org.bigbluebutton.modules.screenshare.view.components.ToolbarButton;
 			
 	public class ToolbarButtonManager {
-    private static const LOGGER:ILogger = getClassLogger(ToolbarButtonManager);
+		private static const LOGGER:ILogger = getClassLogger(ToolbarButtonManager);
     
 		private var button:ToolbarButton;
 		private var isSharing:Boolean = false;
@@ -44,14 +45,12 @@ package org.bigbluebutton.modules.screenshare.managers
 			
 			if ((button != null) && (!buttonShownOnToolbar)) {
 				button = new ToolbarButton();
-				/* Test */ //button.tabIndex=4;
 				var event:ToolbarButtonEvent = new ToolbarButtonEvent(ToolbarButtonEvent.ADD);
 				event.button = button;
 				event.module="DeskShare";
-				//event.tabIndex = 0;
-				globalDispatcher.dispatchEvent(event);	
-				buttonShownOnToolbar = true;	
-				button.enabled = true;		
+				globalDispatcher.dispatchEvent(event);
+				buttonShownOnToolbar = true;
+				button.enabled = true;
 			}
 		}
 			
@@ -59,26 +58,17 @@ package org.bigbluebutton.modules.screenshare.managers
 			if (buttonShownOnToolbar) {
 				var event:ToolbarButtonEvent = new ToolbarButtonEvent(ToolbarButtonEvent.REMOVE);
 				event.button = button;
-				globalDispatcher.dispatchEvent(event);	
-				buttonShownOnToolbar = false;			
+				globalDispatcher.dispatchEvent(event);
+				buttonShownOnToolbar = false;
 			}
-		}
-		//OLD - CAN BE DELETED				
-		public function enableToolbarButton():void {
-			button.enabled = true;
-			button.stopDeskshare();
-		}
-		//OLD - CAN BE DELETED
-		public function disableToolbarButton():void {
-			button.enabled = false;			
 		}
 
 		public function startedSharing():void {
-			button.deskshareStatus(button.START_SHARING);
+			button.deskshareStatus(ToolbarButton.START_SHARING);
 		}
 
 		public function stoppedSharing():void {
-			button.deskshareStatus(button.STOP_SHARING);
+			button.deskshareStatus(ToolbarButton.STOP_SHARING);
 		}
 	}
 }

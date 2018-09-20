@@ -1,7 +1,29 @@
 import Logger from '/imports/startup/server/logger';
+import Users from '/imports/api/users';
 
-export default function logClient() {
-  const args = Array.prototype.slice.call(arguments, 1);
+const logClient = function (type, log, fullInfo = {}) {
+  const SERVER_CONN_ID = this.connection.id;
+  const User = Users.findOne({ connectionId: SERVER_CONN_ID });
+  const logContents = { fullInfo };
 
-  Logger.log(arguments[0], 'Client Log', args);
-}
+  if (User) {
+    if ((fullInfo.credentials && User.meetingId === fullInfo.credentials.meetingId) ||
+      ((fullInfo.meetingId && User.meetingId === fullInfo.meetingId))) {
+      logContents.validUser = 'valid';
+    } else {
+      logContents.validUser = 'invalid';
+    }
+  } else {
+    logContents.validUser = 'notFound';
+  }
+
+  const topic = typeof logContents === 'Object' ? logContents.topic : null;
+
+  if (typeof log === 'string' || log instanceof String) {
+    Logger.log(type, `${topic || 'CLIENT'} LOG: ${log}\n`, logContents);
+  } else {
+    Logger.log(type, `${topic || 'CLIENT'} LOG: ${JSON.stringify(log)}\n`, logContents);
+  }
+};
+
+export default logClient;

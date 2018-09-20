@@ -7,7 +7,7 @@ import _ from 'lodash';
 import UserAvatar from '/imports/ui/components/user-avatar/component';
 import Message from './message/component';
 
-import styles from './styles';
+import { styles } from './styles';
 
 const propTypes = {
   user: PropTypes.object,
@@ -54,19 +54,25 @@ export default class MessageListItem extends Component {
   }
 
   componentDidMount() {
-    const scrollArea = document.getElementById(this.props.chatAreaId);
-    eventsToBeBound.forEach(
-      e => scrollArea.addEventListener(e, this.handleMessageInViewport, false),
-    );
+    const { scrollArea } = this.props;
+
+    if (scrollArea) {
+      eventsToBeBound.forEach(
+        (e) => { scrollArea.addEventListener(e, this.handleMessageInViewport, false); },
+      );
+    }
 
     this.handleMessageInViewport();
   }
 
   componentWillUnmount() {
-    const scrollArea = document.getElementById(this.props.chatAreaId);
-    eventsToBeBound.forEach(
-      e => scrollArea.removeEventListener(e, this.handleMessageInViewport, false),
-    );
+    const { scrollArea } = this.props;
+
+    if (scrollArea) {
+      eventsToBeBound.forEach(
+        (e) => { scrollArea.removeEventListener(e, this.handleMessageInViewport, false); },
+      );
+    }
   }
 
   componentDidUpdate(prevProps, prevState) {
@@ -85,55 +91,8 @@ export default class MessageListItem extends Component {
   }
 
   shouldComponentUpdate(nextProps, nextState) {
-    return !nextState.preventRender && nextState.pendingChanges;
-  }
-
-  render() {
-    const {
-      user,
-      messages,
-      time,
-    } = this.props;
-
-    const dateTime = new Date(time);
-
-    if (!user) {
-      return this.renderSystemMessage();
-    }
-
-    return (
-      <div className={styles.item}>
-        <div className={styles.wrapper} ref={(ref) => { this.item = ref; }}>
-          <div className={styles.avatar}>
-            <UserAvatar user={user} />
-          </div>
-          <div className={styles.content}>
-            <div className={styles.meta}>
-              <div className={!user.isOnline ? styles.name : styles.logout}>
-                <span>{user.name}</span>
-                {user.isOnline ? null : <span className={styles.offline}>(offline)</span>}
-              </div>
-              <time className={styles.time} dateTime={dateTime}>
-                <FormattedTime value={dateTime} />
-              </time>
-            </div>
-            <div className={styles.messages}>
-              {messages.map((message, i) => (
-                <Message
-                  className={styles.message}
-                  key={message.id}
-                  text={message.text}
-                  time={message.time}
-                  chatAreaId={this.props.chatAreaId}
-                  lastReadMessageTime={this.props.lastReadMessageTime}
-                  handleReadMessage={this.props.handleReadMessage}
-                />
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    if(!this.props.scrollArea && nextProps.scrollArea) return true;
+    else return !nextState.preventRender && nextState.pendingChanges;
   }
 
   renderSystemMessage() {
@@ -155,6 +114,61 @@ export default class MessageListItem extends Component {
                 handleReadMessage={this.props.handleReadMessage}
               />
             ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  render() {
+    const {
+      user,
+      messages,
+      time
+    } = this.props;
+
+    const dateTime = new Date(time);
+
+    if (!user) {
+      return this.renderSystemMessage();
+    }
+
+    return (
+      <div className={styles.item}>
+        <div className={styles.wrapper} ref={(ref) => { this.item = ref; }}>
+          <div className={styles.avatarWrapper}>
+            <UserAvatar
+              className={styles.avatar}
+              color={user.color}
+              moderator={user.isModerator}
+            >
+              {user.name.toLowerCase().slice(0, 2)}
+            </UserAvatar>
+          </div>
+          <div className={styles.content}>
+            <div className={styles.meta}>
+              <div className={user.isOnline ? styles.name : styles.logout}>
+                <span>{user.name}</span>
+                {user.isOnline ? null : <span className={styles.offline}>(offline)</span>}
+              </div>
+              <time className={styles.time} dateTime={dateTime}>
+                <FormattedTime value={dateTime} />
+              </time>
+            </div>
+            <div className={styles.messages}>
+              {messages.map(message => (
+                <Message
+                  className={styles.message}
+                  key={message.id}
+                  text={message.text}
+                  time={message.time}
+                  chatAreaId={this.props.chatAreaId}
+                  lastReadMessageTime={this.props.lastReadMessageTime}
+                  handleReadMessage={this.props.handleReadMessage}
+                  scrollArea={this.props.scrollArea}
+                />
+              ))}
+            </div>
           </div>
         </div>
       </div>

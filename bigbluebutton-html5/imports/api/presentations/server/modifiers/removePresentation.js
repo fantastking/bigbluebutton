@@ -4,23 +4,26 @@ import Logger from '/imports/startup/server/logger';
 
 import clearSlidesPresentation from '/imports/api/slides/server/modifiers/clearSlidesPresentation';
 
-export default function removePresentation(meetingId, presentationId) {
+export default function removePresentation(meetingId, podId, presentationId) {
   check(meetingId, String);
   check(presentationId, String);
+  check(podId, String);
 
   const selector = {
     meetingId,
-    'presentation.id': presentationId,
+    podId,
+    id: presentationId,
   };
 
   const cb = (err, numChanged) => {
     if (err) {
-      return Logger.error(`Removing presentation from collection: ${err}`);
+      Logger.error(`Removing presentation from collection: ${err}`);
+      return;
     }
 
     if (numChanged) {
       clearSlidesPresentation(meetingId, presentationId);
-      return Logger.info(`Removed presentation id=${presentationId} meeting=${meetingId}`);
+      Logger.info(`Removed presentation id=${presentationId} meeting=${meetingId}`);
     }
   };
 

@@ -1,11 +1,10 @@
+import RedisPubSub from '/imports/startup/server/redis';
 import { check } from 'meteor/check';
-import Logger from '/imports/startup/server/logger';
-import removeMeeting from '../modifiers/removeMeeting';
 
-export default function handleMeetingDestruction({ payload }) {
-  const meetingId = payload.meeting_id;
-
+export default function handleMeetingDestruction({ body }) {
+  check(body, Object);
+  const { meetingId } = body;
   check(meetingId, String);
 
-  return removeMeeting(meetingId);
+  return RedisPubSub.destroyMeetingQueue(meetingId);
 }

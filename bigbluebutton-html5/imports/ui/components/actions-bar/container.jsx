@@ -1,38 +1,20 @@
-import React, { Component } from 'react';
-import { createContainer } from 'meteor/react-meteor-data';
-import { withModalMounter } from '/imports/ui/components/modal/service';
+import React from 'react';
+import { withTracker } from 'meteor/react-meteor-data';
 import ActionsBar from './component';
 import Service from './service';
-import AudioService from '../audio/service';
+import VideoService from '../video-provider/service';
+import { shareScreen, unshareScreen, isVideoBroadcasting } from '../screenshare/service';
 
-import AudioModal from '../audio/audio-modal/component';
+const ActionsBarContainer = props => <ActionsBar {...props} />;
 
-class ActionsBarContainer extends Component {
-  constructor(props) {
-    super(props);
-  }
-
-  render() {
-    return (
-      <ActionsBar
-        {...this.props}
-      >
-        {this.props.children}
-      </ActionsBar>
-    );
-  }
-}
-
-export default withModalMounter(createContainer(({ mountModal }) => {
-  const isPresenter = Service.isUserPresenter();
-
-  const handleExitAudio = () => AudioService.exitAudio();
-  const handleOpenJoinAudio = () =>
-    mountModal(<AudioModal handleJoinListenOnly={AudioService.joinListenOnly} />);
-
-  return {
-    isUserPresenter: isPresenter,
-    handleExitAudio,
-    handleOpenJoinAudio,
-  };
-}, ActionsBarContainer));
+export default withTracker(() => ({
+  isUserPresenter: Service.isUserPresenter(),
+  isUserModerator: Service.isUserModerator(),
+  handleExitVideo: () => VideoService.exitVideo(),
+  handleJoinVideo: () => VideoService.joinVideo(),
+  handleShareScreen: (onFail) => shareScreen(onFail),
+  handleUnshareScreen: () => unshareScreen(),
+  isVideoBroadcasting: isVideoBroadcasting(),
+  recordSettingsList: Service.recordSettingsList(),
+  toggleRecording: Service.toggleRecording,
+}))(ActionsBarContainer);

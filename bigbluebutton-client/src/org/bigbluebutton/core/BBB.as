@@ -23,39 +23,32 @@ package org.bigbluebutton.core {
 	import mx.core.FlexGlobals;
 	import mx.utils.URLUtil;
 	
+	import org.as3commons.logging.api.ILogger;
+	import org.as3commons.logging.api.getClassLogger;
 	import org.bigbluebutton.core.managers.ConfigManager2;
 	import org.bigbluebutton.core.managers.ConnectionManager;
-	import org.bigbluebutton.core.managers.UserConfigManager;
 	import org.bigbluebutton.core.managers.VideoProfileManager;
-	import org.bigbluebutton.core.model.Session;
+	import org.bigbluebutton.core.model.LiveMeeting;
 	import org.bigbluebutton.core.model.VideoProfile;
-	import org.bigbluebutton.util.SessionTokenUtil;
+	import org.bigbluebutton.util.QueryStringParameters;
 
 	public class BBB {
+		
+		private static const LOGGER:ILogger = getClassLogger(BBB);      
+
 		private static var configManager:ConfigManager2 = null;
 
 		private static var connectionManager:ConnectionManager = null;
 
-		private static var session:Session = null;
-
-		private static var userConfigManager:UserConfigManager = null;
-
 		private static var videoProfileManager:VideoProfileManager = null;
 
-		private static var sessionTokenUtil:SessionTokenUtil = null;
+		private static var queryStringParameters:QueryStringParameters = null;
 
-		public static function getSessionTokenUtil():SessionTokenUtil {
-			if (sessionTokenUtil == null) {
-				sessionTokenUtil = new SessionTokenUtil();
+		public static function getQueryStringParameters():QueryStringParameters {
+			if (queryStringParameters == null) {
+				queryStringParameters = new QueryStringParameters();
 			}
-			return sessionTokenUtil;
-		}
-
-		public static function initUserConfigManager():UserConfigManager {
-			if (userConfigManager == null) {
-				userConfigManager = new UserConfigManager();
-			}
-			return userConfigManager;
+			return queryStringParameters;
 		}
 
 		public static function getConfigManager():ConfigManager2 {
@@ -104,33 +97,20 @@ package org.bigbluebutton.core {
 			return connectionManager;
 		}
 
-		public static function initSession():Session {
-			if (session == null) {
-				session = new Session();
-			}
-			return session;
-		}
-
 		public static function getFlashPlayerVersion():Number {
 			var versionString:String = Capabilities.version;
 			var pattern:RegExp = /^(\w*) (\d*),(\d*),(\d*),(\d*)$/;
 			var result:Object = pattern.exec(versionString);
 			if (result != null) {
-				//	trace("input: " + result.input);
-				//	trace("platform: " + result[1]);
-				//	trace("majorVersion: " + result[2]);
-				//	trace("minorVersion: " + result[3]);    
-				//	trace("buildNumber: " + result[4]);
-				//	trace("internalBuildNumber: " + result[5]);
 				return Number(result[2] + "." + result[3]);
 			} else {
-				//	trace("Unable to match RegExp.");
+				LOGGER.warn("Unable to match RegExp.");
 				return 0;
 			}
 		}
 
 		public static function getLogoutURL():String {
-			var logoutUrl:String = BBB.initUserConfigManager().getLogoutUrl();
+			var logoutUrl:String = LiveMeeting.inst().me.logoutURL;
 			if (logoutUrl == null) {
 				logoutUrl = getBaseURL();
 			}
@@ -138,7 +118,7 @@ package org.bigbluebutton.core {
 		}
 
 		public static function getSignoutURL():String {
-			var sessionToken:String = BBB.sessionTokenUtil.getSessionToken();
+			var sessionToken:String = getQueryStringParameters().getSessionToken();
 			var logoutUrl:String = getBaseURL();
 			if (sessionToken != "") {
 				logoutUrl += "/bigbluebutton/api/signOut?sessionToken=" + sessionToken;
@@ -147,9 +127,7 @@ package org.bigbluebutton.core {
 		}
 
 		public static function getBaseURL():String {
-			var protocol:String = URLUtil.getProtocol(FlexGlobals.topLevelApplication.url);
-			var serverName:String = URLUtil.getServerNameWithPort(FlexGlobals.topLevelApplication.url);
-			return protocol + "://" + serverName;
+			return FlexGlobals.topLevelApplication.loaderInfo.parameters.origin
 		}
 	}
 }

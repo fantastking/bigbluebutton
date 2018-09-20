@@ -1,15 +1,37 @@
-import Logger from '/imports/startup/server/logger';
 import { check } from 'meteor/check';
-import updateCursor from '../modifiers/updateCursor';
+import { CursorStreamer } from '/imports/api/cursor';
 
-export default function handleCursorUpdate({ payload }) {
-  const meetingId = payload.meeting_id;
-  const x = payload.x_percent;
-  const y = payload.y_percent;
+const CURSOR_PROCCESS_INTERVAL = 30;
+
+let cursorQueue = [];
+let cursorRecieverIsRunning = false;
+
+const proccess = () => {
+  if (!Object.keys(cursorQueue).length) {
+    cursorRecieverIsRunning = false;
+    return;
+  }
+  cursorRecieverIsRunning = true;
+  
+  Object.keys(cursorQueue).forEach(meetingId => {
+    CursorStreamer.emit('message', { meetingId, cursors: cursorQueue[meetingId] });
+  });
+  cursorQueue = {};
+
+  Meteor.setTimeout(proccess, CURSOR_PROCCESS_INTERVAL);
+};
+
+export default function handleCursorUpdate({ header, body }, meetingId) {
+  const { userId } = header;
+  check(body, Object);
 
   check(meetingId, String);
-  check(x, Number);
-  check(y, Number);
+  check(userId, String);
 
-  return updateCursor(meetingId, x, y);
+  if(!cursorQueue.hasOwnProperty(meetingId)) {
+    cursorQueue[meetingId] = {};
+  }
+  // overwrite since we dont care about the other positions
+  cursorQueue[meetingId][userId] = body;
+  if (!cursorRecieverIsRunning) proccess();
 }

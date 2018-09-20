@@ -2,24 +2,23 @@ import { Meteor } from 'meteor/meteor';
 import { check } from 'meteor/check';
 import RedisPubSub from '/imports/startup/server/redis';
 import Logger from '/imports/startup/server/logger';
-import { isAllowedTo } from '/imports/startup/server/userPermissions';
 import Users from '/imports/api/users';
-
 import createDummyUser from '../modifiers/createDummyUser';
-import setConnectionStatus from '../modifiers/setConnectionStatus';
-
-const ONLINE_CONNECTION_STATUS = 'online';
+import setConnectionIdAndAuthToken from '../modifiers/setConnectionIdAndAuthToken';
 
 export default function validateAuthToken(credentials) {
-  const REDIS_CONFIG = Meteor.settings.redis;
-  const CHANNEL = REDIS_CONFIG.channels.toBBBApps.meeting;
-  const EVENT_NAME = 'validate_auth_token';
+  const REDIS_CONFIG = Meteor.settings.private.redis;
+  const CHANNEL = REDIS_CONFIG.channels.toAkkaApps;
+  const EVENT_NAME = 'ValidateAuthTokenReqMsg';
 
   const { meetingId, requesterUserId, requesterToken } = credentials;
 
   check(meetingId, String);
   check(requesterUserId, String);
   check(requesterToken, String);
+
+  const sessionId = `${meetingId}-${requesterUserId}`;
+  this.setUserId(sessionId);
 
   const User = Users.findOne({
     meetingId,
@@ -28,23 +27,16 @@ export default function validateAuthToken(credentials) {
 
   if (!User) {
     createDummyUser(meetingId, requesterUserId, requesterToken);
-  } else if (User.validated) {
-    setConnectionStatus(meetingId, requesterUserId, ONLINE_CONNECTION_STATUS);
   }
 
+  setConnectionIdAndAuthToken(meetingId, requesterUserId, this.connection.id, requesterToken);
+
   const payload = {
-    auth_token: requesterToken,
-    userid: requesterUserId,
-    meeting_id: meetingId,
+    userId: requesterUserId,
+    authToken: requesterToken,
   };
 
-  const header = {
-    reply_to: `${meetingId}/${requesterUserId}`,
-  };
+  Logger.info(`User '${requesterUserId}' is trying to validate auth token for meeting '${meetingId}'`);
 
-  Logger.info(`User '${
-    requesterUserId
-  }' is trying to validate auth tokenfor meeting '${meetingId}'`);
-
-  return RedisPubSub.publish(CHANNEL, EVENT_NAME, payload, header);
+  return RedisPubSub.publishUserMessage(CHANNEL, EVENT_NAME, meetingId, requesterUserId, payload);
 }

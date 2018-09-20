@@ -1,53 +1,52 @@
-import AuthSingleton from '/imports/ui/services/auth/index.js';
-import Users from '/imports/api/users';
+import PresentationPods from '/imports/api/presentation-pods';
+import Auth from '/imports/ui/services/auth';
 import Slides from '/imports/api/slides';
-import { makeCall } from '/imports/ui/services/api/index.js';
+import { makeCall } from '/imports/ui/services/api';
 
-const getSlideData = (params) => {
-  const { currentSlideNum, presentationId } = params;
+const getSlideData = (podId, presentationId) => {
+  // Get  meetingId and userId
+  const meetingId = Auth.meetingID;
+  const userId = Auth.userID;
 
-  // Get userId and meetingId
-  const userId = AuthSingleton.userID;
-  const meetingId = AuthSingleton.meetingID;
-
-  // Find the user object of this specific meeting and userid
-  const currentUser = Users.findOne({
+  // fetching the presentation pod in order to see who owns it
+  const selector = {
     meetingId,
-    userId,
-  });
-
-  let userIsPresenter;
-  if (currentUser && currentUser.user) {
-    userIsPresenter = currentUser.user.presenter;
-  }
+    podId,
+  };
+  const pod = PresentationPods.findOne(selector);
+  const userIsPresenter = pod.currentPresenterId === userId;
 
   // Get total number of slides in this presentation
   const numberOfSlides = Slides.find({
     meetingId,
+    podId,
     presentationId,
   }).fetch().length;
 
   return {
-    userIsPresenter,
     numberOfSlides,
   };
 };
 
-const previousSlide = (currentSlideNum) => {
+const previousSlide = (currentSlideNum, podId) => {
   if (currentSlideNum > 1) {
-    makeCall('switchSlideMessage', currentSlideNum - 1);
+    makeCall('switchSlide', currentSlideNum - 1, podId);
   }
 };
 
-const nextSlide = (currentSlideNum, numberOfSlides) => {
+const nextSlide = (currentSlideNum, numberOfSlides, podId) => {
   if (currentSlideNum < numberOfSlides) {
-    makeCall('switchSlideMessage', currentSlideNum + 1);
+    makeCall('switchSlide', currentSlideNum + 1, podId);
   }
 };
 
-const skipToSlide = (event) => {
-  const requestedSlideNum = parseInt(event.target.value);
-  makeCall('switchSlideMessage', requestedSlideNum);
+const zoomSlide = (currentSlideNum, podId, widthRatio, heightRatio, xOffset, yOffset) => {
+  makeCall('zoomSlide', currentSlideNum, podId, widthRatio, heightRatio, xOffset, yOffset);
+};
+
+
+const skipToSlide = (requestedSlideNum, podId) => {
+  makeCall('switchSlide', requestedSlideNum, podId);
 };
 
 export default {
@@ -55,4 +54,5 @@ export default {
   nextSlide,
   previousSlide,
   skipToSlide,
+  zoomSlide,
 };

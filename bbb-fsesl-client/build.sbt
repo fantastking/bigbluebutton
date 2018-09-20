@@ -1,12 +1,10 @@
-
-
 name := "bbb-fsesl-client"
 
 description := "BigBlueButton custom FS-ESL client built on top of FS-ESL Java library."
 
 organization := "org.bigbluebutton"
 
-version := "0.0.4"
+version := "0.0.6"
 
 // We want to have our jar files in lib_managed dir.
 // This way we'll have the right path when we import
@@ -19,9 +17,9 @@ testOptions in Test += Tests.Argument(TestFrameworks.ScalaTest, "-h", "target/sc
 
 libraryDependencies ++= {
   Seq(
-	  "org.jboss.netty"          %  "netty"             % "3.2.1.Final",
-	  "junit"                    %  "junit"             % "4.11",
-	  "ch.qos.logback"           %  "logback-classic"   % "1.0.3"
+	  "org.jboss.netty"          %  "netty"             % "3.2.10.Final",
+	  "junit"                    %  "junit"             % "4.12",
+	  "ch.qos.logback"           %  "logback-classic"   % "1.2.3"
 	)}
 
 seq(Revolver.settings: _*)
@@ -59,6 +57,13 @@ publishTo := Some(Resolver.file("file",  new File(Path.userHome.absolutePath+"/.
 publishMavenStyle := true
 
 publishArtifact in Test := false
+
+// http://www.scala-sbt.org/release/docs/Artifacts.html
+// disable publishing the main API jar
+publishArtifact in (Compile, packageDoc) := false
+
+// disable publishing the main sources jar
+publishArtifact in (Compile, packageSrc) := false
 
 pomIncludeRepository := { _ => false }
 

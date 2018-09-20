@@ -2,13 +2,12 @@ import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 import { defineMessages, injectIntl } from 'react-intl';
 import _ from 'lodash';
-import styles from './styles';
-
 import Button from '/imports/ui/components/button/component';
+import { styles } from './styles';
 import MessageListItem from './message-list-item/component';
 
 const propTypes = {
-  messages: PropTypes.array.isRequired,
+  messages: PropTypes.arrayOf(PropTypes.object).isRequired,
 };
 
 const intlMessages = defineMessages({
@@ -29,24 +28,93 @@ class MessageList extends Component {
     this.shouldScrollBottom = false;
     this.lastKnowScrollPosition = 0;
     this.ticking = false;
-
     this.handleScrollChange = _.debounce(this.handleScrollChange.bind(this), 150);
     this.handleScrollUpdate = _.debounce(this.handleScrollUpdate.bind(this), 150);
+
+    this.state = {};
   }
 
-  scrollTo(position = null) {
+
+  componentDidMount() {
     const { scrollArea } = this;
 
-    if (position === null) {
-      position = scrollArea.scrollHeight - scrollArea.clientHeight;
+    this.setState({
+      scrollArea: this.scrollArea
+    });
+
+    this.scrollTo(this.props.scrollPosition);
+    scrollArea.addEventListener('scroll', this.handleScrollChange, false);
+  }
+
+  componentWillReceiveProps(nextProps) {
+    if (this.props.chatId !== nextProps.chatId) {
+      const { scrollArea } = this;
+      this.handleScrollUpdate(scrollArea.scrollTop, scrollArea);
+    }
+  }
+
+  shouldComponentUpdate(nextProps, nextState) {
+    const {
+      chatId,
+      hasUnreadMessages,
+      partnerIsLoggedOut,
+    } = this.props;
+
+    if(!this.state.scrollArea && nextState.scrollArea) return true;
+
+    const switchingCorrespondent = chatId !== nextProps.chatId;
+    const hasNewUnreadMessages = hasUnreadMessages !== nextProps.hasUnreadMessages;
+
+    // check if the messages include <user has left the meeting>
+    const lastMessage = nextProps.messages[nextProps.messages.length - 1];
+    if (lastMessage) {
+      const userLeftIsDisplayed = lastMessage.id.includes('partner-disconnected');
+      if (!(partnerIsLoggedOut && userLeftIsDisplayed)) return true;
     }
 
-    scrollArea.scrollTop = position;
+    if (switchingCorrespondent || hasNewUnreadMessages) return true;
+
+    return false;
+  }
+
+  componentWillUpdate(nextProps) {
+    if (this.props.chatId !== nextProps.chatId) {
+      this.shouldScrollBottom = false;
+      return;
+    }
+
+    const { scrollArea } = this;
+
+    const position = scrollArea.scrollTop + scrollArea.offsetHeight;
+
+    // Compare with <1 to account for the chance scrollArea.scrollTop is a float
+    // value in some browsers.
+    this.shouldScrollBottom = position === scrollArea.scrollHeight ||
+      (scrollArea.scrollHeight - position < 1) ||
+      nextProps.scrollPosition === null;
+  }
+
+  componentDidUpdate(prevProps) {
+    const { scrollPosition, chatId } = this.props;
+
+    if (this.shouldScrollBottom) {
+      this.scrollTo();
+    } else if (prevProps.chatId !== chatId) {
+      this.scrollTo(scrollPosition);
+    }
+  }
+
+  componentWillUnmount() {
+    const { scrollArea } = this;
+
+    this.handleScrollUpdate(scrollArea.scrollTop, scrollArea);
+    scrollArea.removeEventListener('scroll', this.handleScrollChange, false);
   }
 
   handleScrollUpdate(position, target) {
     if (position !== null && position + target.offsetHeight === target.scrollHeight) {
-      position = null; // update with null so it keeps auto scrolling
+      this.props.handleScrollUpdate(null);
+      return;
     }
 
     this.props.handleScrollUpdate(position);
@@ -66,87 +134,43 @@ class MessageList extends Component {
     this.ticking = true;
   }
 
-  componentWillReceiveProps(nextProps) {
-    if (this.props.chatId !== nextProps.chatId) {
-      const { scrollArea } = this;
-      this.handleScrollUpdate(scrollArea.scrollTop, scrollArea);
-    }
-  }
+  scrollTo(position = null) {
+    const { scrollArea } = this;
 
-  componentWillUpdate(nextProps) {
-    if (this.props.chatId !== nextProps.chatId) {
-      this.shouldScrollBottom = false;
+    if (position === null) {
+      scrollArea.scrollTop = scrollArea.scrollHeight - scrollArea.clientHeight;
       return;
     }
 
-    const { scrollArea } = this;
-
-    const position = scrollArea.scrollTop + scrollArea.offsetHeight;
-
-    // Compare with <1 to account for the chance scrollArea.scrollTop is a float
-    // value in some browsers.
-    this.shouldScrollBottom = position === scrollArea.scrollHeight ||
-                              (scrollArea.scrollHeight - position < 1) ||
-                              nextProps.scrollPosition === null;
+    scrollArea.scrollTop = position;
   }
 
-  componentDidUpdate(prevProps) {
-    const { scrollPosition, chatId } = this.props;
+  renderUnreadNotification() {
+    const { intl, hasUnreadMessages, scrollPosition } = this.props;
 
-    if (this.shouldScrollBottom) {
-      this.scrollTo();
-    } else if (prevProps.chatId !== chatId) {
-      this.scrollTo(scrollPosition);
-    }
-  }
-
-  componentDidMount() {
-    const { scrollArea } = this;
-
-    this.scrollTo(this.props.scrollPosition);
-    scrollArea.addEventListener('scroll', this.handleScrollChange, false);
-  }
-
-  componentWillUnmount() {
-    const { scrollArea } = this;
-
-    this.handleScrollUpdate(scrollArea.scrollTop, scrollArea);
-    scrollArea.removeEventListener('scroll', this.handleScrollChange, false);
-  }
-
-  shouldComponentUpdate(nextProps) {
-    const {
-      chatId,
-      hasUnreadMessages,
-      partnerIsLoggedOut,
-    } = this.props;
-
-    const switchingCorrespondent = chatId !== nextProps.chatId;
-    const hasNewUnreadMessages = hasUnreadMessages !== nextProps.hasUnreadMessages;
-
-    // check if the messages include <user has left the meeting>
-    const lastMessage = nextProps.messages[nextProps.messages.length - 1];
-    if (lastMessage) {
-      const userLeftIsDisplayed = lastMessage.id.includes('partner-disconnected');
-      if (!(partnerIsLoggedOut && userLeftIsDisplayed)) return true;
+    if (hasUnreadMessages && scrollPosition !== null) {
+      return (
+        <Button
+          aria-hidden="true"
+          className={styles.unreadButton}
+          size="sm"
+          label={intl.formatMessage(intlMessages.moreMessages)}
+          onClick={() => this.scrollTo()}
+        />
+      );
     }
 
-    if (switchingCorrespondent || hasNewUnreadMessages) return true;
-
-    return false;
+    return null;
   }
 
   render() {
     const { messages, intl } = this.props;
-
-    const isEmpty = messages.length == 0;
-
+    const isEmpty = messages.length === 0;
     return (
       <div className={styles.messageListWrapper}>
         <div
           role="log"
-          tabIndex="0"
-          ref={(ref) => { this.scrollArea = ref; }}
+          ref={(ref) => { if (ref != null) { this.scrollArea = ref; } }}
           id={this.props.id}
           className={styles.messageList}
           aria-live="polite"
@@ -164,29 +188,13 @@ class MessageList extends Component {
               time={message.time}
               chatAreaId={this.props.id}
               lastReadMessageTime={this.props.lastReadMessageTime}
+              scrollArea={this.state.scrollArea}
             />
           ))}
         </div>
         {this.renderUnreadNotification()}
       </div>
     );
-  }
-
-  renderUnreadNotification() {
-    const { intl, hasUnreadMessages, scrollPosition } = this.props;
-
-    if (hasUnreadMessages && scrollPosition !== null) {
-      return (
-        <Button
-          className={styles.unreadButton}
-          size={'sm'}
-          label={intl.formatMessage(intlMessages.moreMessages)}
-          onClick={() => this.scrollTo()}
-        />
-      );
-    }
-
-    return null;
   }
 }
 

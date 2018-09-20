@@ -1,17 +1,18 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 import { IntlProvider } from 'react-intl';
+import Settings from '/imports/ui/services/settings';
+import LoadingScreen from '/imports/ui/components/loading-screen/component';
 
 const propTypes = {
-  locale: PropTypes.string.isRequired,
-  baseControls: PropTypes.object.isRequired,
-  children: PropTypes.object.isRequired,
+  locale: PropTypes.string,
+  children: PropTypes.element.isRequired,
 };
 
-const BROWSER_LANGUAGE = window.navigator.userLanguage || window.navigator.language;
+const DEFAULT_LANGUAGE = Meteor.settings.public.app.defaultSettings.application.locale;
 
 const defaultProps = {
-  locale: BROWSER_LANGUAGE,
+  locale: DEFAULT_LANGUAGE,
 };
 
 class IntlStartup extends Component {
@@ -20,17 +21,20 @@ class IntlStartup extends Component {
 
     this.state = {
       messages: {},
-      appLocale: this.props.locale,
+      normalizedLocale: null,
+      fetching: false,
     };
 
     this.fetchLocalizedMessages = this.fetchLocalizedMessages.bind(this);
   }
   componentWillMount() {
-    this.fetchLocalizedMessages(this.state.appLocale);
+    this.fetchLocalizedMessages(this.props.locale);
   }
 
   componentWillUpdate(nextProps) {
-    if (this.props.locale !== nextProps.locale) {
+    if (!this.state.fetching
+      && this.state.normalizedLocale
+      && nextProps.locale.toLowerCase() !== this.state.normalizedLocale.toLowerCase()) {
       this.fetchLocalizedMessages(nextProps.locale);
     }
   }
@@ -38,35 +42,34 @@ class IntlStartup extends Component {
   fetchLocalizedMessages(locale) {
     const url = `/html5client/locale?locale=${locale}`;
 
-    const { baseControls } = this.props;
-    this.setState({ appLocale: locale });
+    this.setState({ fetching: true }, () => {
+      fetch(url)
+        .then((response) => {
+          if (!response.ok) {
+            return Promise.reject();
+          }
 
-    baseControls.updateLoadingState(true);
-    fetch(url)
-      .then((response) => {
-        if (response.ok) {
           return response.json();
-        }
-        this.setState({ appLocale: 'en' });
-        return response.json();
-      })
-      .then((messages) => {
-        if (messages.statusCode === 506) {
-          this.setState({ appLocale: 'en' });
-        }
-        this.setState({ messages: messages.messages }, () => {
-          baseControls.updateLoadingState(false);
+        })
+        .then(({ messages, normalizedLocale }) => {
+          const dasherizedLocale = normalizedLocale.replace('_', '-');
+          this.setState({ messages, fetching: false, normalizedLocale: dasherizedLocale }, () => {
+            Settings.application.locale = dasherizedLocale;
+            Settings.save();
+          });
+        })
+        .catch(() => {
+          this.setState({ fetching: false, normalizedLocale: null }, () => {
+            Settings.application.locale = DEFAULT_LANGUAGE;
+            Settings.save();
+          });
         });
-      })
-      .catch((reason) => {
-        baseControls.updateErrorState(reason);
-        baseControls.updateLoadingState(false);
-      });
+    });
   }
 
   render() {
-    return (
-      <IntlProvider locale={this.state.appLocale} messages={this.state.messages}>
+    return this.state.fetching ? <LoadingScreen /> : (
+      <IntlProvider locale={this.state.normalizedLocale} messages={this.state.messages}>
         {this.props.children}
       </IntlProvider>
     );

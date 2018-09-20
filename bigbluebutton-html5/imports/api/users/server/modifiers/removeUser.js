@@ -1,10 +1,14 @@
 import { check } from 'meteor/check';
 import Users from '/imports/api/users';
 import Logger from '/imports/startup/server/logger';
+import ejectUserFromVoice from '/imports/api/voice-users/server/methods/ejectUserFromVoice';
 
-import setConnectionStatus from './setConnectionStatus';
-
-const CLIENT_TYPE_HTML = 'HTML5';
+const clearAllSessions = (sessionUserId) => {
+  const serverSessions = Meteor.server.sessions;
+  Object.keys(serverSessions)
+    .filter(i => serverSessions[i].userId === sessionUserId)
+    .forEach(i => serverSessions[i].close());
+};
 
 export default function removeUser(meetingId, userId) {
   check(meetingId, String);
@@ -15,31 +19,30 @@ export default function removeUser(meetingId, userId) {
     userId,
   };
 
-  const User = Users.findOne(selector);
-
   const modifier = {
     $set: {
-      'user.connection_status': 'offline',
-      'user.voiceUser.talking': false,
-      'user.voiceUser.joined': false,
-      'user.voiceUser.muted': false,
-      'user.time_of_joining': 0,
-      'user.listenOnly': false,
-      'user.validated': false,
-      'user.emoji_status': 'none',
-      'user.presenter': false,
-      'user.role': 'VIEWER',
+      connectionStatus: 'offline',
+      validated: false,
+      emoji: 'none',
+      presenter: false,
+      role: 'VIEWER',
     },
   };
 
-  const cb = (err, numChanged) => {
+  const cb = (err) => {
     if (err) {
       return Logger.error(`Removing user from collection: ${err}`);
     }
 
-    if (numChanged) {
-      return Logger.info(`Removed ${CLIENT_TYPE_HTML} user id=${userId} meeting=${meetingId}`);
-    }
+    const sessionUserId = `${meetingId}-${userId}`;
+    clearAllSessions(sessionUserId);
+
+    ejectUserFromVoice({
+      requesterUserId: userId,
+      meetingId,
+    }, userId);
+
+    return Logger.info(`Removed user id=${userId} meeting=${meetingId}`);
   };
 
   return Users.update(selector, modifier, cb);

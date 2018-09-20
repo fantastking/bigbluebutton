@@ -1,9 +1,9 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
-import styles from '../styles';
 import _ from 'lodash';
 import cx from 'classnames';
 import Icon from '/imports/ui/components/icon/component';
+import { styles } from '../styles';
 
 const propTypes = {
   icon: PropTypes.string,
@@ -12,6 +12,10 @@ const propTypes = {
 };
 
 const defaultProps = {
+  icon: '',
+  label: '',
+  description: '',
+  tabIndex: 0,
 };
 
 export default class DropdownListItem extends Component {
@@ -22,21 +26,24 @@ export default class DropdownListItem extends Component {
   }
 
   renderDefault() {
-    const children = [];
-    const { icon, label } = this.props;
+    const { icon, label, iconRight } = this.props;
 
     return [
       (icon ? <Icon iconName={icon} key="icon" className={styles.itemIcon} /> : null),
       (<span className={styles.itemLabel} key="label">{label}</span>),
+      (iconRight ? <Icon iconName={iconRight} key="iconRight" className={styles.iconRight} /> : null),
     ];
   }
 
   render() {
-    const { label, description, children, injectRef, tabIndex, onClick, onKeyDown,
-      className, style, separator, intl, } = this.props;
+    const {
+      id, label, description, children, injectRef, tabIndex, onClick, onKeyDown,
+      className, style,
+    } = this.props;
 
     return (
       <li
+        id={id}
         ref={injectRef}
         onClick={onClick}
         onKeyDown={onKeyDown}
@@ -46,14 +53,15 @@ export default class DropdownListItem extends Component {
         className={cx(styles.item, className)}
         style={style}
         role="menuitem"
+        data-test={this.props['data-test']}
       >
         {
           children || this.renderDefault()
         }
         {
           label ?
-          (<span id={this.labelID} key="labelledby" hidden>{label}</span>)
-          : null
+            (<span id={this.labelID} key="labelledby" hidden>{label}</span>)
+            : null
         }
         <span id={this.descID} key="describedby" hidden>{description}</span>
       </li>

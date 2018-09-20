@@ -20,27 +20,28 @@ with BigBlueButton; if not, see <http://www.gnu.org/licenses/>.
 
 -->
 
-<mx:Module xmlns:mx="http://www.adobe.com/2006/mxml"
-
+<mx:Module xmlns:mx="library://ns.adobe.com/flex/mx"
+		   xmlns:fx="http://ns.adobe.com/mxml/2009"
            implements="org.bigbluebutton.common.IBigBlueButtonModule"
-           creationComplete="onCreationComplete()" xmlns:maps1="org.bigbluebutton.modules.screenshare.maps.*">
+           creationComplete="onCreationComplete()" xmlns:maps="org.bigbluebutton.modules.screenshare.maps.*">
 
-  <maps1:ScreenshareEventMap id="deskshareGlobalEventMap" />
-  <maps1:WebRTCDeskshareEventMap id="webRTCDeskshareEventMap" />
+	<fx:Declarations>
+	  <maps:ScreenshareEventMap id="deskshareGlobalEventMap" />
+	  <maps:WebRTCDeskshareEventMap id="webRTCDeskshareEventMap" />
+	</fx:Declarations>
 
-  <mx:Script>
+  <fx:Script>
     <![CDATA[
       import com.asfusion.mate.events.Dispatcher;
+      
       import org.as3commons.logging.api.ILogger;
       import org.as3commons.logging.api.getClassLogger;
       import org.bigbluebutton.modules.screenshare.events.ModuleEvent;
-      import org.bigbluebutton.modules.screenshare.maps.ScreenshareEventMap;
       
       private static const LOGGER:ILogger = getClassLogger(ScreenshareModule);
       
       private var _moduleName:String = "Desk Share";
-      private var _attributes:Object;
-      
+
       private var globalDispatcher:Dispatcher = new Dispatcher();;
       
       private function onCreationComplete():void{
@@ -51,34 +52,8 @@ with BigBlueButton; if not, see <http://www.gnu.org/licenses/>.
         return _moduleName;
       }
       
-      public function get uri():String{
-        return _attributes.uri;
-      }
-      
-      public function get username():String{
-        return _attributes.username;
-      }
-      
-      public function get mode():String{
-        if (_attributes.mode == null){
-          _attributes.mode = "LIVE";
-          LOGGER.debug("Setting DeskShare mode: " + _attributes.mode);
-        }
-        LOGGER.debug("DeskShare mode: " + _attributes.mode);
-        return _attributes.mode;
-      }
-      
-      public function get userid():Number{
-        return _attributes.userid as Number;
-      }
-      
-      public function get role():String{
-        return _attributes.userrole as String;
-      }
-      
       public function start(attributes:Object):void{
-        LOGGER.debug("desk share attr: " + attributes.username);
-        _attributes = attributes;
+        LOGGER.debug("desk share attr: " + attributes.username)
         
         var startEvent:ModuleEvent = new ModuleEvent(ModuleEvent.START);
         startEvent.module = this;
@@ -91,28 +66,7 @@ with BigBlueButton; if not, see <http://www.gnu.org/licenses/>.
         globalDispatcher.dispatchEvent(stopEvent);
       }
       
-      public function getRoom():String{
-        return _attributes.room;
-      }
-      
-      public function getRed5ServerUri():String{
-        return _attributes.uri;
-      }
-      
-      public function getCaptureServerUri():String{
-        var uri:String = _attributes.uri;
-        uri = uri.split("/")[2];
-        return uri;
-      }
-      
-      public function tunnel():Boolean {
-        if (_attributes.protocol == "RTMPT") {
-          LOGGER.debug("Use tunneling for desktop sharing");
-          return true;
-        }
-        return false;
-      }
     ]]>
-  </mx:Script>
+  </fx:Script>
   
 </mx:Module>

@@ -1,326 +1,114 @@
 import React, { Component } from 'react';
+import { injectIntl } from 'react-intl';
 import PropTypes from 'prop-types';
 import { withRouter } from 'react-router';
-import CSSTransitionGroup from 'react-transition-group/CSSTransitionGroup';
-import styles from './styles.scss';
-import cx from 'classnames';
-import { defineMessages, injectIntl } from 'react-intl';
-import UserListItem from './user-list-item/component.jsx';
-import ChatListItem from './chat-list-item/component.jsx';
-import KEY_CODES from '/imports/utils/keyCodes';
+import injectWbResizeEvent from '/imports/ui/components/presentation/resize-wrapper/component';
+import { styles } from './styles';
+import CustomLogo from './custom-logo/component';
+import UserContent from './user-list-content/component';
 
 const propTypes = {
-  openChats: PropTypes.array.isRequired,
-  users: PropTypes.array.isRequired,
+  openChats: PropTypes.arrayOf(String).isRequired,
+  users: PropTypes.arrayOf(Object).isRequired,
+  compact: PropTypes.bool,
+  intl: PropTypes.shape({
+    formatMessage: PropTypes.func.isRequired,
+  }).isRequired,
+  currentUser: PropTypes.shape({}).isRequired,
+  meeting: PropTypes.shape({}),
+  isBreakoutRoom: PropTypes.bool,
+  getAvailableActions: PropTypes.func.isRequired,
+  normalizeEmojiName: PropTypes.func.isRequired,
+  isMeetingLocked: PropTypes.func.isRequired,
+  isPublicChat: PropTypes.func.isRequired,
+  setEmojiStatus: PropTypes.func.isRequired,
+  assignPresenter: PropTypes.func.isRequired,
+  removeUser: PropTypes.func.isRequired,
+  toggleVoice: PropTypes.func.isRequired,
+  changeRole: PropTypes.func.isRequired,
+  roving: PropTypes.func.isRequired,
+  getGroupChatPrivate: PropTypes.func.isRequired,
 };
-
+const SHOW_BRANDING = Meteor.settings.public.app.branding.displayBrandingArea;
 const defaultProps = {
-};
-
-const listTransition = {
-  enter: styles.enter,
-  enterActive: styles.enterActive,
-  appear: styles.appear,
-  appearActive: styles.appearActive,
-  leave: styles.leave,
-  leaveActive: styles.leaveActive,
+  compact: false,
+  isBreakoutRoom: false,
+  // This one is kinda tricky, meteor takes sometime to fetch the data and passing down
+  // So the first time its create, the meeting comes as null, sending an error to the client.
+  meeting: {},
 };
 
 class UserList extends Component {
   constructor(props) {
     super(props);
-    this.state = {
-      compact: this.props.compact,
-    };
-
-    this.rovingIndex = this.rovingIndex.bind(this);
-    this.focusList = this.focusList.bind(this);
-    this.focusedItemIndex = -1;
-  }
-
-  focusList(list) {
-    document.activeElement.tabIndex = -1;
-    this.focusedItemIndex = -1;
-    list.tabIndex = 0;
-    list.focus();
-  }
-
-  rovingIndex(event, listType) {
-    const { users, openChats } = this.props;
-    
-    let active = document.activeElement;
-    let list;
-    let items;
-    let numberOfItems;
-    
-    const focusElement = () => {
-      active.tabIndex = -1;
-      items.childNodes[this.focusedItemIndex].tabIndex = 0;
-      items.childNodes[this.focusedItemIndex].focus();
-    }
-    
-    switch (listType) {
-      case 'users':
-        list = this._usersList;
-        items = this._userItems;
-        numberOfItems = users.length;
-        break;
-      case 'messages':
-        list = this._msgsList;
-        items = this._msgItems;
-        numberOfItems = openChats.length;
-        break;
-    }
-
-    if (event.keyCode === KEY_CODES.ESCAPE
-      || this.focusedItemIndex < 0
-      || this.focusedItemIndex > numberOfItems) {
-        this.focusList(list);
-    }
-
-    if ([KEY_CODES.ARROW_RIGHT, KEY_CODES.ARROW_SPACE].includes(event.keyCode)) {
-      active.firstChild.click();
-    }
-
-    if (event.keyCode === KEY_CODES.ARROW_DOWN) {
-      this.focusedItemIndex += 1;
-
-      if (this.focusedItemIndex == numberOfItems) {
-        this.focusedItemIndex = 0;
-      }
-      focusElement();
-    }
-
-    if (event.keyCode === KEY_CODES.ARROW_UP) {
-      this.focusedItemIndex -= 1;
-
-      if (this.focusedItemIndex < 0) {
-        this.focusedItemIndex = numberOfItems - 1;
-      }
-
-      focusElement();
-    }
-  }
-
-  componentDidMount() {
-    if (!this.state.compact) {
-      this._msgsList.addEventListener('keydown',
-        event=>this.rovingIndex(event, "messages"));
-
-      this._usersList.addEventListener('keydown',
-        event=>this.rovingIndex(event, "users"));
-    }
   }
 
   render() {
-    return (
-      <div className={styles.userList}>
-        {this.renderHeader()}
-        {this.renderContent()}
-      </div>
-    );
-  }
-
-  renderHeader() {
-    const { intl } = this.props;
-
-    return (
-      <div className={styles.header}>
-        {
-          !this.state.compact ?
-            <div className={styles.headerTitle} role="banner">
-              {intl.formatMessage(intlMessages.participantsTitle)}
-            </div> : null
-        }
-      </div>
-    );
-  }
-
-  renderContent() {
-    return (
-      <div className={styles.content}>
-        {this.renderMessages()}
-        {this.renderParticipants()}
-      </div>
-    );
-  }
-
-  renderMessages() {
     const {
-      openChats,
-      openChat,
       intl,
-    } = this.props;
-
-    return (
-      <div className={styles.messages}>
-        {
-          !this.state.compact ?
-            <div className={styles.smallTitle} role="banner">
-              {intl.formatMessage(intlMessages.messagesTitle)}
-            </div> : <hr className={styles.separator} />
-        }
-        <div
-          tabIndex={0}
-          className={styles.scrollableList}
-          ref={(ref) => { this._msgsList = ref; }}
-        >
-          <CSSTransitionGroup
-            transitionName={listTransition}
-            transitionAppear={true}
-            transitionEnter={true}
-            transitionLeave={false}
-            transitionAppearTimeout={0}
-            transitionEnterTimeout={0}
-            transitionLeaveTimeout={0}
-            component="div"
-            className={cx(styles.chatsList, styles.scrollableList)}
-          >
-            <div ref={(ref) => { this._msgItems = ref; }}>
-              {openChats.map(chat => (
-                <ChatListItem
-                  compact={this.state.compact}
-                  key={chat.id}
-                  openChat={openChat}
-                  chat={chat}
-                  tabIndex={-1}
-                />
-              ))}
-            </div>
-          </CSSTransitionGroup>
-        </div>
-      </div>
-    );
-  }
-
-  renderParticipants() {
-    const {
+      openChats,
       users,
+      compact,
       currentUser,
       isBreakoutRoom,
-      intl,
-      makeCall,
+      setEmojiStatus,
+      assignPresenter,
+      removeUser,
+      toggleVoice,
+      changeRole,
       meeting,
+      getAvailableActions,
+      normalizeEmojiName,
+      isMeetingLocked,
+      isPublicChat,
+      roving,
+      CustomLogoUrl,
+      getGroupChatPrivate,
+      handleEmojiChange,
+      getEmojiList,
+      getEmoji,
     } = this.props;
 
-    const userActions = {
-      openChat: {
-        label: intl.formatMessage(intlMessages.ChatLabel),
-        handler: (router, user) => router.push(`/users/chat/${user.id}`),
-        icon: 'chat',
-      },
-      clearStatus: {
-        label: intl.formatMessage(intlMessages.ClearStatusLabel),
-        handler: user => makeCall('setEmojiStatus', user.id, 'none'),
-        icon: 'clear_status',
-      },
-      setPresenter: {
-        label: intl.formatMessage(intlMessages.MakePresenterLabel),
-        handler: user => makeCall('assignPresenter', user.id),
-        icon: 'presentation',
-      },
-      kick: {
-        label: intl.formatMessage(intlMessages.KickUserLabel),
-        handler: user => makeCall('kickUser', user.id),
-        icon: 'circle_close',
-      },
-      mute: {
-        label: intl.formatMessage(intlMessages.MuteUserAudioLabel),
-        handler: user => makeCall('muteUser', user.id),
-        icon: 'audio_off',
-      },
-      unmute: {
-        label: intl.formatMessage(intlMessages.UnmuteUserAudioLabel),
-        handler: user => makeCall('unmuteUser', user.id),
-        icon: 'audio_on',
-      },
-    };
-
     return (
-      <div className={styles.participants}>
+      <div className={styles.userList}>
         {
-          !this.state.compact ?
-            <div className={styles.smallTitle} role="banner">
-              {intl.formatMessage(intlMessages.usersTitle)}
-            &nbsp;({users.length})
-          </div> : <hr className={styles.separator} />
+          SHOW_BRANDING
+          && !this.props.compact
+          && CustomLogoUrl
+          ? <CustomLogo CustomLogoUrl={CustomLogoUrl} /> : null
         }
-        <div
-          className={styles.scrollableList}
-          tabIndex={0}
-          ref={(ref) => { this._usersList = ref; }}
-        >
-          <CSSTransitionGroup
-            transitionName={listTransition}
-            transitionAppear={true}
-            transitionEnter={true}
-            transitionLeave={true}
-            transitionAppearTimeout={0}
-            transitionEnterTimeout={0}
-            transitionLeaveTimeout={0}
-            component="div"
-            className={cx(styles.participantsList, styles.scrollableList)}
-          >
-            <div ref={(ref) => { this._userItems = ref; }}>
-              {
-                users.map(user => (
-                  <UserListItem
-                    compact={this.state.compact}
-                    key={user.id}
-                    isBreakoutRoom={isBreakoutRoom}
-                    user={user}
-                    currentUser={currentUser}
-                    userActions={userActions}
-                    meeting={meeting}
-                  />
-                ))
-              }
-            </div>
-          </CSSTransitionGroup>
-        </div>
+        {<UserContent
+          {...{
+          intl,
+          openChats,
+          users,
+          compact,
+          currentUser,
+          isBreakoutRoom,
+          setEmojiStatus,
+          assignPresenter,
+          removeUser,
+          toggleVoice,
+          changeRole,
+          meeting,
+          getAvailableActions,
+          normalizeEmojiName,
+          isMeetingLocked,
+          isPublicChat,
+          roving,
+          getGroupChatPrivate,
+          handleEmojiChange,
+          getEmojiList,
+          getEmoji,
+        }
+      }
+        />}
       </div>
     );
   }
 }
 
-const intlMessages = defineMessages({
-  usersTitle: {
-    id: 'app.userlist.usersTitle',
-    description: 'Title for the Header',
-  },
-  messagesTitle: {
-    id: 'app.userlist.messagesTitle',
-    description: 'Title for the messages list',
-  },
-  participantsTitle: {
-    id: 'app.userlist.participantsTitle',
-    description: 'Title for the Users list',
-  },
-  ChatLabel: {
-    id: 'app.userlist.menu.chat.label',
-    description: 'Save the changes and close the settings menu',
-  },
-  ClearStatusLabel: {
-    id: 'app.userlist.menu.clearStatus.label',
-    description: 'Clear the emoji status of this user',
-  },
-  MakePresenterLabel: {
-    id: 'app.userlist.menu.makePresenter.label',
-    description: 'Set this user to be the presenter in this meeting',
-  },
-  KickUserLabel: {
-    id: 'app.userlist.menu.kickUser.label',
-    description: 'Forcefully remove this user from the meeting',
-  },
-  MuteUserAudioLabel: {
-    id: 'app.userlist.menu.muteUserAudio.label',
-    description: 'Forcefully mute this user',
-  },
-  UnmuteUserAudioLabel: {
-    id: 'app.userlist.menu.unmuteUserAudio.label',
-    description: 'Forcefully unmute this user',
-  },
-});
-
 UserList.propTypes = propTypes;
-export default withRouter(injectIntl(UserList));
+UserList.defaultProps = defaultProps;
+
+export default withRouter(injectWbResizeEvent(injectIntl(UserList)));

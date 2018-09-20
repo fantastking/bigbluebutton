@@ -1,12 +1,8 @@
 import React, { Component } from 'react';
-import PropTypes from 'prop-types';
 import { defineMessages, injectIntl } from 'react-intl';
-import { findDOMNode } from 'react-dom';
 import cx from 'classnames';
-import styles from './styles';
-
-import MessageFormActions from './message-form-actions/component';
 import TextareaAutosize from 'react-autosize-textarea';
+import { styles } from './styles';
 import Button from '../../button/component';
 
 const propTypes = {
@@ -51,6 +47,16 @@ class MessageForm extends Component {
     this.handleSubmit = this.handleSubmit.bind(this);
   }
 
+  componentDidMount() {
+    this.textarea.focus();
+  }
+
+  componentDidUpdate(prevProps) {
+    if (prevProps.chatName !== this.props.chatName) {
+      this.textarea.focus();
+    }
+  }
+
   handleMessageKeyDown(e) {
     // TODO Prevent send message pressing enter on mobile and/or virtual keyboard
     if (e.keyCode === 13 && !e.shiftKey) {
@@ -74,13 +80,17 @@ class MessageForm extends Component {
     const { minMessageLength, maxMessageLength } = this.props;
 
     if (message.length < minMessageLength) {
-      error = intl.formatMessage(messages.errorMinMessageLength,
-        { 0: minMessageLength - message.length });
+      error = intl.formatMessage(
+        messages.errorMinMessageLength,
+        { 0: minMessageLength - message.length },
+      );
     }
 
     if (message.length > maxMessageLength) {
-      error = intl.formatMessage(messages.errorMaxMessageLength,
-        { 0: message.length - maxMessageLength });
+      error = intl.formatMessage(
+        messages.errorMaxMessageLength,
+        { 0: message.length - maxMessageLength },
+      );
     }
 
     this.setState({
@@ -117,8 +127,10 @@ class MessageForm extends Component {
   }
 
   render() {
-    const { intl, chatTitle, chatName, disabled,
-      minMessageLength, maxMessageLength } = this.props;
+    const {
+      intl, chatTitle, chatName, disabled,
+      minMessageLength, maxMessageLength,
+    } = this.props;
 
     const { hasErrors, error } = this.state;
 
@@ -132,6 +144,7 @@ class MessageForm extends Component {
           <TextareaAutosize
             className={styles.input}
             id="message-input"
+            innerRef={ref => (this.textarea = ref)}
             placeholder={intl.formatMessage(messages.inputPlaceholder, { 0: chatName })}
             aria-controls={this.props.chatAreaId}
             aria-label={intl.formatMessage(messages.inputLabel, { 0: chatTitle })}
@@ -146,12 +159,14 @@ class MessageForm extends Component {
             onKeyDown={this.handleMessageKeyDown}
           />
           <Button
+            hideLabel
+            circle
             className={styles.sendButton}
             aria-label={intl.formatMessage(messages.submitLabel)}
             type="submit"
             disabled={disabled}
             label={intl.formatMessage(messages.submitLabel)}
-            hideLabel
+            color="primary"
             icon="send"
             onClick={() => null}
           />

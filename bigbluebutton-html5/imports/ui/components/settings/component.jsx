@@ -1,16 +1,16 @@
 import React, { Component } from 'react';
 import Modal from '/imports/ui/components/modal/fullscreen/component';
 import { Tab, Tabs, TabList, TabPanel } from 'react-tabs';
-import { defineMessages, injectIntl } from 'react-intl';
-import { withModalMounter } from '../modal/service';
+import { defineMessages, injectIntl, intlShape } from 'react-intl';
 import ClosedCaptions from '/imports/ui/components/settings/submenus/closed-captions/component';
+import DataSaving from '/imports/ui/components/settings/submenus/data-saving/component';
 import Application from '/imports/ui/components/settings/submenus/application/container';
-import Participants from '/imports/ui/components/settings/submenus/participants/component';
-import Video from '/imports/ui/components/settings/submenus/video/component';
 import _ from 'lodash';
+import PropTypes from 'prop-types';
 
+import { withModalMounter } from '../modal/service';
 import Icon from '../icon/component';
-import styles from './styles';
+import { styles } from './styles';
 
 const intlMessages = defineMessages({
   appTabLabel: {
@@ -53,29 +53,44 @@ const intlMessages = defineMessages({
     id: 'app.settings.main.save.label.description',
     description: 'Settings modal save button label',
   },
+  dataSavingLabel: {
+    id: 'app.settings.dataSavingTab.label',
+    description: 'label for data savings tab',
+  },
 });
 
 const propTypes = {
+  intl: intlShape.isRequired,
+  dataSaving: PropTypes.object.isRequired,
+  application: PropTypes.object.isRequired,
+  cc: PropTypes.object.isRequired,
+  participants: PropTypes.object.isRequired,
+  updateSettings: PropTypes.func.isRequired,
+  availableLocales: PropTypes.object.isRequired,
+  mountModal: PropTypes.func.isRequired,
+  locales: PropTypes.array.isRequired,
 };
 
 class Settings extends Component {
+  static setHtmlFontSize(size) {
+    document.getElementsByTagName('html')[0].style.fontSize = size;
+  }
   constructor(props) {
     super(props);
 
-    const video = props.video;
-    const application = props.application;
-    const cc = props.cc;
-    const participants = props.participants;
+    const {
+      dataSaving, participants, cc, application,
+    } = props;
 
     this.state = {
       current: {
-        video: _.clone(video),
+        dataSaving: _.clone(dataSaving),
         application: _.clone(application),
         cc: _.clone(cc),
         participants: _.clone(participants),
       },
       saved: {
-        video: _.clone(video),
+        dataSaving: _.clone(dataSaving),
         application: _.clone(application),
         cc: _.clone(cc),
         participants: _.clone(participants),
@@ -94,37 +109,6 @@ class Settings extends Component {
     });
   }
 
-  setHtmlFontSize(size) {
-    document.getElementsByTagName('html')[0].style.fontSize = size;
-  }
-
-  render() {
-    const intl = this.props.intl;
-
-    return (
-      <Modal
-        title={intl.formatMessage(intlMessages.SettingsLabel)}
-        confirm={{
-          callback: (() => {
-            this.props.mountModal(null);
-            this.updateSettings(this.state.current);
-          }),
-          label: intl.formatMessage(intlMessages.SaveLabel),
-          description: intl.formatMessage(intlMessages.SaveLabelDesc),
-        }}
-        dismiss={{
-          callback: (() => {
-            this.setHtmlFontSize(this.state.saved.application.fontSize);
-          }),
-          label: intl.formatMessage(intlMessages.CancelLabel),
-          description: intl.formatMessage(intlMessages.CancelLabelDesc),
-        }}
-      >
-        {this.renderModalContent()}
-      </Modal>
-    );
-  }
-
   handleUpdateSettings(key, newSettings) {
     const settings = this.state;
     settings.current[key] = newSettings;
@@ -138,10 +122,7 @@ class Settings extends Component {
   }
 
   renderModalContent() {
-    const {
-      isModerator,
-      intl,
-    } = this.props;
+    const { intl } = this.props;
 
     return (
       <Tabs
@@ -149,26 +130,43 @@ class Settings extends Component {
         onSelect={this.handleSelectTab}
         selectedIndex={this.state.selectedTab}
         role="presentation"
+        selectedTabPanelClassName={styles.selectedTab}
       >
         <TabList className={styles.tabList}>
-          <Tab className={styles.tabSelector} aria-labelledby="appTab">
+          <Tab
+            className={styles.tabSelector}
+            aria-labelledby="appTab"
+            selectedClassName={styles.selected}
+          >
             <Icon iconName="application" className={styles.icon} />
             <span id="appTab">{intl.formatMessage(intlMessages.appTabLabel)}</span>
           </Tab>
-          {/* <Tab className={styles.tabSelector} aria-labelledby="videoTab">*/}
-          {/* <Icon iconName='video' className={styles.icon}/>*/}
-          {/* <span id="videoTab">{intl.formatMessage(intlMessages.videoTabLabel)}</span>*/}
-          {/* </Tab>*/}
-          <Tab className={styles.tabSelector} aria-labelledby="ccTab">
+          {/* <Tab className={styles.tabSelector} aria-labelledby="videoTab"> */}
+          {/* <Icon iconName='video' className={styles.icon}/> */}
+          {/* <span id="videoTab">{intl.formatMessage(intlMessages.videoTabLabel)}</span> */}
+          {/* </Tab> */}
+          <Tab
+            className={styles.tabSelector}
+            aria-labelledby="ccTab"
+            selectedClassName={styles.selected}
+          >
             <Icon iconName="user" className={styles.icon} />
             <span id="ccTab">{intl.formatMessage(intlMessages.closecaptionTabLabel)}</span>
           </Tab>
-          { isModerator ?
-            <Tab className={styles.tabSelector} aria-labelledby="usersTab">
-              <Icon iconName="user" className={styles.icon} />
-              <span id="usersTab">{intl.formatMessage(intlMessages.usersTabLabel)}</span>
-            </Tab>
-            : null }
+          <Tab
+            className={styles.tabSelector}
+            aria-labelledby="dataSavingTab"
+            selectedClassName={styles.selected}
+          >
+            <Icon iconName="network" className={styles.icon} />
+            <span id="dataSaving">{intl.formatMessage(intlMessages.dataSavingLabel)}</span>
+          </Tab>
+          {/* { isModerator ? */}
+          {/* <Tab className={styles.tabSelector} aria-labelledby="usersTab"> */}
+          {/* <Icon iconName="user" className={styles.icon} /> */}
+          {/* <span id="usersTab">{intl.formatMessage(intlMessages.usersTabLabel)}</span> */}
+          {/* </Tab> */}
+          {/* : null } */}
         </TabList>
         <TabPanel className={styles.tabPanel}>
           <Application
@@ -177,12 +175,12 @@ class Settings extends Component {
             settings={this.state.current.application}
           />
         </TabPanel>
-        {/* <TabPanel className={styles.tabPanel}>*/}
-        {/* <Video*/}
-        {/* handleUpdateSettings={this.handleUpdateSettings}*/}
-        {/* settings={this.state.current.video}*/}
-        {/* />*/}
-        {/* </TabPanel>*/}
+        {/* <TabPanel className={styles.tabPanel}> */}
+        {/* <Video */}
+        {/* handleUpdateSettings={this.handleUpdateSettings} */}
+        {/* settings={this.state.current.video} */}
+        {/* /> */}
+        {/* </TabPanel> */}
         <TabPanel className={styles.tabPanel}>
           <ClosedCaptions
             settings={this.state.current.cc}
@@ -190,15 +188,57 @@ class Settings extends Component {
             locales={this.props.locales}
           />
         </TabPanel>
-        { isModerator ?
-          <TabPanel className={styles.tabPanel}>
-            <Participants
-              settings={this.state.current.participants}
-              handleUpdateSettings={this.handleUpdateSettings}
-            />
-          </TabPanel>
-          : null }
+        <TabPanel className={styles.tabPanel}>
+          <DataSaving
+            settings={this.state.current.dataSaving}
+            handleUpdateSettings={this.handleUpdateSettings}
+          />
+        </TabPanel>
+        {/* { isModerator ? */}
+        {/* <TabPanel className={styles.tabPanel}> */}
+        {/* <Participants */}
+        {/* settings={this.state.current.participants} */}
+        {/* handleUpdateSettings={this.handleUpdateSettings} */}
+        {/* /> */}
+        {/* </TabPanel> */}
+        {/* : null } */}
       </Tabs>
+    );
+  }
+  render() {
+    const {
+      intl,
+      router,
+      location,
+      mountModal,
+    } = this.props;
+
+    return (
+      <Modal
+        title={intl.formatMessage(intlMessages.SettingsLabel)}
+        confirm={{
+          callback: () => {
+            this.updateSettings(this.state.current);
+            router.push(location.pathname);
+            /* We need to use mountModal(null) here to prevent submenu state updates,
+            *  from re-opening the modal.
+            */
+            mountModal(null);
+          },
+          label: intl.formatMessage(intlMessages.SaveLabel),
+          description: intl.formatMessage(intlMessages.SaveLabelDesc),
+        }}
+        dismiss={{
+          callback: () => {
+            Settings.setHtmlFontSize(this.state.saved.application.fontSize);
+            mountModal(null);
+          },
+          label: intl.formatMessage(intlMessages.CancelLabel),
+          description: intl.formatMessage(intlMessages.CancelLabelDesc),
+        }}
+      >
+        {this.renderModalContent()}
+      </Modal>
     );
   }
 }

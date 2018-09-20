@@ -1,42 +1,68 @@
-import React from 'react';
-import AudioModal from './audio-modal/component';
-import Meetings from '/imports/api/meetings';
 import Users from '/imports/api/users';
 import Auth from '/imports/ui/services/auth';
+import AudioManager from '/imports/ui/services/audio-manager';
+import Meetings from '/imports/api/meetings';
+import mapUser from '/imports/ui/services/user/mapUser';
 
-import AudioManager from '/imports/api/audio/client/manager';
-
-let audioManager;
-const init = () => {
+const init = (messages) => {
+  AudioManager.setAudioMessages(messages);
+  if (AudioManager.initialized) return;
+  const meetingId = Auth.meetingID;
   const userId = Auth.userID;
+  const { sessionToken } = Auth;
   const User = Users.findOne({ userId });
-  const username = User.user.name;
+  const username = User.name;
+  const Meeting = Meetings.findOne({ meetingId: User.meetingId });
+  const voiceBridge = Meeting.voiceProp.voiceConf;
 
-  const Meeting = Meetings.findOne(); // TODO test this with Breakouts
-  const turns = Meeting.turns;
-  const stuns = Meeting.stuns;
-  const voiceBridge = Meeting.voiceConf;
-  const microphoneLockEnforced = Meeting.roomLockSettings.disableMic;
+  // FIX ME
+  const microphoneLockEnforced = false;
 
   const userData = {
+    meetingId,
     userId,
+    sessionToken,
     username,
-    turns,
-    stuns,
     voiceBridge,
     microphoneLockEnforced,
   };
 
-  audioManager = new AudioManager(userData);
+  AudioManager.init(userData);
 };
 
-const exitAudio = () => audioManager.exitAudio();
-const joinListenOnly = () => audioManager.joinAudio(true);
-const joinMicrophone = () => audioManager.joinAudio(false);
+const audioLocked = () => {
+  const userId = Auth.userID;
+  const User = mapUser(Users.findOne({ userId }));
+
+  const Meeting = Meetings.findOne({ meetingId: Auth.meetingID });
+  const lockSetting = Meeting.lockSettingsProp;
+  const audioLock = lockSetting ? lockSetting.disableMic : false;
+
+  return audioLock && User.isLocked;
+};
 
 export default {
   init,
-  exitAudio,
-  joinListenOnly,
-  joinMicrophone,
+  exitAudio: () => AudioManager.exitAudio(),
+  transferCall: () => AudioManager.transferCall(),
+  joinListenOnly: () => AudioManager.joinListenOnly(),
+  joinMicrophone: () => AudioManager.joinMicrophone(),
+  joinEchoTest: () => AudioManager.joinEchoTest(),
+  toggleMuteMicrophone: () => AudioManager.toggleMuteMicrophone(),
+  changeInputDevice: inputDeviceId => AudioManager.changeInputDevice(inputDeviceId),
+  changeOutputDevice: outputDeviceId => AudioManager.changeOutputDevice(outputDeviceId),
+  isConnected: () => AudioManager.isConnected,
+  isTalking: () => AudioManager.isTalking,
+  isHangingUp: () => AudioManager.isHangingUp,
+  isUsingAudio: () => AudioManager.isUsingAudio(),
+  isWaitingPermissions: () => AudioManager.isWaitingPermissions,
+  isMuted: () => AudioManager.isMuted,
+  isConnecting: () => AudioManager.isConnecting,
+  isListenOnly: () => AudioManager.isListenOnly,
+  inputDeviceId: () => AudioManager.inputDeviceId,
+  outputDeviceId: () => AudioManager.outputDeviceId,
+  isEchoTest: () => AudioManager.isEchoTest,
+  error: () => AudioManager.error,
+  isUserModerator: () => Users.findOne({ userId: Auth.userID }).moderator,
+  audioLocked,
 };

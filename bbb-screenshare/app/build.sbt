@@ -1,3 +1,4 @@
+
 //enablePlugins(JavaServerAppPackaging)
 enablePlugins(JettyPlugin)
 
@@ -5,9 +6,9 @@ name := "bbb-screenshare-akka"
 
 organization := "org.bigbluebutton"
 
-version := "0.0.1"
+version := "0.0.2"
 
-scalaVersion  := "2.11.7"
+scalaVersion  := "2.12.6"
 
 scalacOptions ++= Seq(
   "-unchecked",
@@ -25,6 +26,8 @@ resolvers ++= Seq(
   "blindside-repos" at "http://blindside.googlecode.com/svn/repository/"
 )
 
+resolvers += Resolver.sonatypeRepo("releases")
+
 publishTo := Some(Resolver.file("file",  new File(Path.userHome.absolutePath+"/dev/repo/maven-repo/releases" )) )
 
 // We want to have our jar files in lib_managed dir.
@@ -32,35 +35,44 @@ publishTo := Some(Resolver.file("file",  new File(Path.userHome.absolutePath+"/d
 // into eclipse.
 retrieveManaged := true
 
+testOptions in Test += Tests.Argument(TestFrameworks.Specs2, "html", "console", "junitxml")
+
+testOptions in Test += Tests.Argument(TestFrameworks.ScalaTest, "-h", "target/scalatest-reports")
+
+val akkaVersion  = "2.5.14"
+val scalaTestV  = "2.2.6"
+
 libraryDependencies ++= {
-    val akkaVersion  = "2.4.2"
-    val springVersion = "4.3.3.RELEASE"
+    val springVersion = "4.3.12.RELEASE"
   Seq(
     "com.typesafe.akka"        %%  "akka-actor"        % akkaVersion,
     "com.typesafe.akka"        %%  "akka-testkit"      % akkaVersion    % "test",
     "com.typesafe.akka"        %%  "akka-slf4j"        % akkaVersion,
     "com.typesafe"              %  "config"            % "1.3.0",
-    "ch.qos.logback"            %  "logback-classic"   % "1.1.6" % "runtime",
-    //    "org.pegdown"               %  "pegdown"           % "1.4.0",
-    //    "junit"                     %  "junit"             % "4.11",
-    //    "com.etaty.rediscala"      %%  "rediscala"         % "1.4.0",
-    "commons-codec"             %  "commons-codec"     % "1.10",
-        "redis.clients"             %  "jedis"             % "2.7.2",
-    //    "org.apache.commons"        %  "commons-lang3"     % "3.2",
-    "org.apache.commons"        %  "commons-pool2"     % "2.3",
-    "org.red5"                  %  "red5-server"       % "1.0.8-M13",
-    "com.google.code.gson"      %  "gson"              % "2.5",
+    "ch.qos.logback"            %  "logback-classic"   % "1.2.3" % "runtime",
+    "commons-codec"             %  "commons-codec"     % "1.11",
+    "redis.clients"             %  "jedis"             % "2.9.0",
+    "org.apache.commons"        %  "commons-pool2"     % "2.6.0",
+    "org.red5"                  %  "red5-server"       % "1.0.10-M5",
+    "com.google.code.gson"      %  "gson"              % "2.8.5",
     "org.springframework"       %  "spring-web"        % springVersion,
     "org.springframework"       %  "spring-beans"      % springVersion,
     "org.springframework"       %  "spring-context"    % springVersion,
     "org.springframework"       %  "spring-core"       % springVersion,
     "org.springframework"       %  "spring-webmvc"     % springVersion,
     "org.springframework"       %  "spring-aop"        % springVersion,
-    "org.bigbluebutton"         %  "bbb-common-message"% "0.0.18-SNAPSHOT",
     "javax.servlet"             %  "servlet-api"       % "2.5"
-
-
   )}
+
+// https://mvnrepository.com/artifact/org.scala-lang/scala-library
+libraryDependencies += "org.scala-lang" % "scala-library" % scalaVersion.value
+libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value
+
+libraryDependencies += "org.bigbluebutton" % "bbb-common-message_2.12" % "0.0.19-SNAPSHOT"
+// https://mvnrepository.com/artifact/com.github.etaty/rediscala_2.12
+libraryDependencies += "com.github.etaty" % "rediscala_2.12" % "1.8.0"
+// https://mvnrepository.com/artifact/com.fasterxml.jackson.module/jackson-module-scala_2.12
+libraryDependencies += "com.fasterxml.jackson.module" % "jackson-module-scala_2.12" % "2.9.6"
 
 //seq(Revolver.settings: _*)
 //

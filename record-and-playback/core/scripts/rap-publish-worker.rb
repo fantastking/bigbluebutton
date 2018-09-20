@@ -22,22 +22,42 @@ require '../lib/recordandplayback'
 require 'rubygems'
 require 'yaml'
 require 'fileutils'
+require 'custom_hash'
 
 def publish_processed_meetings(recording_dir)
   processed_done_files = Dir.glob("#{recording_dir}/status/processed/*.done")
 
   FileUtils.mkdir_p("#{recording_dir}/status/published")
+  # TODO sort by timestamp(s)
   processed_done_files.each do |processed_done|
-    match = /([^\/]*)-([^\/-]*).done$/.match(processed_done)
-    meeting_id = match[1]
-    publish_type = match[2]
+    done_base = File.basename(processed_done, '.done')
+    meeting_id = nil
+    break_timestamp = nil
+    publish_type = nil
+
+    if match = /^([0-9a-f]+-[0-9]+)-([0-9]+)-(.+)$/.match(done_base)
+      meeting_id = match[1]
+      break_timestamp = match[2]
+      publish_type = match[3]
+    elsif match = /^([0-9a-f]+-[0-9]+)-(.+)$/.match(done_base)
+      meeting_id = match[1]
+      publish_type = match[2]
+    else
+      BigBlueButton.logger.warn("Processed done file for #{done_base} has invalid format")
+      next
+    end
+    if !break_timestamp.nil?
+      done_base = "#{meeting_id}-#{break_timestamp}"
+    else
+      done_base = meeting_id
+    end
 
     step_succeeded = false
 
-    published_done = "#{recording_dir}/status/published/#{meeting_id}-#{publish_type}.done"
+    published_done = "#{recording_dir}/status/published/#{done_base}-#{publish_type}.done"
     next if File.exists?(published_done)
 
-    published_fail = "#{recording_dir}/status/published/#{meeting_id}-#{publish_type}.fail"
+    published_fail = "#{recording_dir}/status/published/#{done_base}-#{publish_type}.fail"
     next if File.exists?(published_fail)
 
     publish_script = "publish/#{publish_type}.rb"
@@ -45,20 +65,65 @@ def publish_processed_meetings(recording_dir)
       BigBlueButton.redis_publisher.put_publish_started(publish_type, meeting_id)
 
       # If the publish directory exists, the script does nothing
-      FileUtils.rm_rf("#{recording_dir}/publish/#{publish_type}/#{meeting_id}")
+      process_dir = "#{recording_dir}/process/#{publish_type}/#{done_base}"
+      publish_dir = "#{recording_dir}/publish/#{publish_type}/#{done_base}"
+      FileUtils.rm_rf(publish_dir)
 
       step_start_time = BigBlueButton.monotonic_clock
       # For legacy reasons, the meeting ID passed to the publish script contains
       # the playback format name.
-      ret = BigBlueButton.exec_ret("ruby", publish_script, "-m", "#{meeting_id}-#{publish_type}")
+      if !break_timestamp.nil?
+        ret = BigBlueButton.exec_ret('ruby', publish_script,
+                                     '-m', "#{meeting_id}-#{publish_type}",
+                                     '-b', break_timestamp)
+      else
+        ret = BigBlueButton.exec_ret('ruby', publish_script,
+                                     '-m', "#{meeting_id}-#{publish_type}")
+      end
       step_stop_time = BigBlueButton.monotonic_clock
       step_time = step_stop_time - step_start_time
 
       step_succeeded = (ret == 0 and File.exists?(published_done))
 
+      props = YAML::load(File.open('bigbluebutton.yml'))
+      published_dir = props['published_dir']
+
+      playback = {}
+      metadata = {}
+      download = {}
+      raw_size = {}
+      start_time = {}
+      end_time = {}
+      metadata_xml_path = "#{published_dir}/#{publish_type}/#{done_base}/metadata.xml"
+      if File.exists? metadata_xml_path
+        begin
+          doc = Hash.from_xml(File.open(metadata_xml_path))
+          playback = doc[:recording][:playback] if !doc[:recording][:playback].nil?
+          metadata = doc[:recording][:meta] if !doc[:recording][:meta].nil?
+          download = doc[:recording][:download] if !doc[:recording][:download].nil?
+          raw_size = doc[:recording][:raw_size] if !doc[:recording][:raw_size].nil?
+          start_time = doc[:recording][:start_time] if !doc[:recording][:start_time].nil?
+          end_time = doc[:recording][:end_time] if !doc[:recording][:end_time].nil?
+        rescue Exception => e
+          BigBlueButton.logger.warn "An exception occurred while loading the extra information for the publish event"
+          BigBlueButton.logger.warn e.message
+          e.backtrace.each do |traceline|
+            BigBlueButton.logger.warn traceline
+          end
+        end
+      else
+        BigBlueButton.logger.warn "Couldn't find the metadata file at #{metadata_xml_path}"
+      end
+
       BigBlueButton.redis_publisher.put_publish_ended(publish_type, meeting_id, {
         "success" => step_succeeded,
-        "step_time" => step_time
+        "step_time" => step_time,
+        "playback" => playback,
+        "metadata" => metadata,
+        "download" => download,
+        "raw_size" => raw_size,
+        "start_time" => start_time,
+        "end_time" => end_time
       })
     else
       BigBlueButton.logger.warn("Processed recording found for type #{publish_type}, but no publish script exists")
@@ -66,17 +131,17 @@ def publish_processed_meetings(recording_dir)
     end
 
     if step_succeeded
-      BigBlueButton.logger.info("Publish format #{publish_type} succeeded for #{meeting_id}")
+      BigBlueButton.logger.info("Publish format #{publish_type} succeeded for #{meeting_id} break #{break_timestamp}")
       FileUtils.rm_f(processed_done)
-      FileUtils.rm_rf("#{recording_dir}/process/#{publish_type}/#{meeting_id}")
-      FileUtils.rm_rf("#{recording_dir}/publish/#{publish_type}/#{meeting_id}")
+      FileUtils.rm_rf(process_dir)
+      FileUtils.rm_rf(publish_dir)
       
       # Check if this is the last format to be published
       if Dir.glob("#{recording_dir}/status/processed/#{meeting_id}-*.done").length == 0
         post_publish(meeting_id)
       end
     else
-      BigBlueButton.logger.info("Publish format #{publish_type} failed for #{meeting_id}")
+      BigBlueButton.logger.info("Publish format #{publish_type} failed for #{meeting_id} break #{break_timestamp}")
       FileUtils.touch(published_fail)
     end
 

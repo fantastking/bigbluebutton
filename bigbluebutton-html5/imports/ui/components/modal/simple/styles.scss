@@ -1,10 +1,11 @@
-@import "../../../stylesheets/variables/_all";
+@import "/imports/ui/stylesheets/variables/_all";
 @import "../base/styles";
 
 .modal {
   display: flex;
   flex-direction: column;
   padding: ($line-height-computed / 2) $line-height-computed;
+  box-shadow : 0px 0px 15px rgba(0, 0, 0, 0.5);
 }
 
 .content {

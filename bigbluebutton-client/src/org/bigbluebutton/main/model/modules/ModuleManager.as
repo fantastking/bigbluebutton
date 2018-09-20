@@ -22,17 +22,12 @@ package org.bigbluebutton.main.model.modules
 	
 	import flash.system.ApplicationDomain;
 	import flash.utils.Dictionary;
-	
 	import mx.collections.ArrayCollection;
-	
 	import org.as3commons.logging.api.ILogger;
 	import org.as3commons.logging.api.getClassLogger;
 	import org.bigbluebutton.common.IBigBlueButtonModule;
-	import org.bigbluebutton.common.Role;
 	import org.bigbluebutton.core.BBB;
-	import org.bigbluebutton.core.model.MeetingModel;
 	import org.bigbluebutton.main.events.AppVersionEvent;
-	import org.bigbluebutton.main.model.ConferenceParameters;
 	
 	public class ModuleManager
 	{
@@ -46,13 +41,14 @@ package org.bigbluebutton.main.model.modules
 		private var sorted:ArrayCollection; //The array of modules sorted by dependencies, with least dependent first
 		
 		private var _applicationDomain:ApplicationDomain;
-		private var conferenceParameters:ConferenceParameters;
 		
 		private var modulesDispatcher:ModulesDispatcher;
 		
+		
+		
 		public function ModuleManager(modulesDispatcher: ModulesDispatcher)
 		{
-            this.modulesDispatcher = modulesDispatcher;
+      this.modulesDispatcher = modulesDispatcher;
 			_applicationDomain = new ApplicationDomain(ApplicationDomain.currentDomain);
 		}
 				
@@ -66,6 +62,8 @@ package org.bigbluebutton.main.model.modules
 			var resolver:DependancyResolver = new DependancyResolver();
 			sorted = resolver.buildDependencyTree(modules);
 			
+			BBB.initConnectionManager().initPortTestOption();
+
 			modulesDispatcher.sendPortTestEvent();
 		}
 		
@@ -73,23 +71,7 @@ package org.bigbluebutton.main.model.modules
 			BBB.getConfigManager();
 			BBB.loadConfig();
 		}
-		
-		public function useProtocol(tunnel:Boolean):void {
-      BBB.initConnectionManager().isTunnelling = tunnel;			
-		}
-		
-		public function get portTestHost():String {
-			return BBB.getConfigManager().getPortortTestHost();
-		}
-		
-		public function get portTestApplication():String {
-			return BBB.getConfigManager().getPortTestApplication();
-		}
-		
-		public function get portTestTimeout():Number {
-			return BBB.getConfigManager().getPortTestTimeout();
-		}
-		
+
 		private function getModule(name:String):ModuleDescriptor {
 			return BBB.getConfigManager().getModuleFor(name);	
 		}
@@ -98,13 +80,13 @@ package org.bigbluebutton.main.model.modules
 			var m:ModuleDescriptor = getModule(name);
 			if (m != null) {
 				var bbb:IBigBlueButtonModule = m.module as IBigBlueButtonModule;
-        var protocol:String = "rtmp";
-        if (BBB.initConnectionManager().isTunnelling) {
-          protocol = "rtmpt";
-        }
-				m.loadConfigAttributes(conferenceParameters, protocol);
-				bbb.start(m.attributes);		
-			}	
+				var protocol:String = "rtmp";
+				if (BBB.initConnectionManager().isTunnelling) {
+					protocol = "rtmpt";
+				}
+				m.loadConfigAttributes(protocol);
+				bbb.start(m.attributes);
+			}
 		}
 
 		private function stopModule(name:String):void {
@@ -142,17 +124,14 @@ package org.bigbluebutton.main.model.modules
 			} 
 			
 			if (allModulesLoaded()) {
-				sendAppAndLocaleVersions();
+				sendAppVersion();
 			}
 		}
 		
-		private function sendAppAndLocaleVersions():void {
+		private function sendAppVersion():void {
 			var dispatcher:Dispatcher = new Dispatcher();
 			var versionEvent:AppVersionEvent = new AppVersionEvent();
 			versionEvent.appVersion = BBB.getConfigManager().config.version;	
-			versionEvent.localeVersion = BBB.getConfigManager().config.locale.version; 
-			versionEvent.configLocaleVersion = true;
-			versionEvent.suppressLocaleWarning = BBB.getConfigManager().config.locale.suppressLocaleWarning;
 			dispatcher.dispatchEvent(versionEvent);			
 		}
 		
@@ -164,23 +143,21 @@ package org.bigbluebutton.main.model.modules
 			modulesDispatcher.sendStartUserServicesEvent();
 		}
 		
-		public function loadAllModules(parameters:ConferenceParameters):void{
+		public function loadAllModules():void{
 			modulesDispatcher.sendModuleLoadingStartedEvent();
-			conferenceParameters = parameters;
-			Role.setRole(parameters.role);
 			
 			for (var i:int = 0; i<sorted.length; i++){
 				var m:ModuleDescriptor = sorted.getItemAt(i) as ModuleDescriptor;
 				loadModule(m.getName());
 			}
 		}
-		
-		public function startLayoutModule():void{
-			for (var i:int = 0; i<sorted.length; i++){
+
+		public function startLayoutModule():void {
+			for (var i:int = 0; i < sorted.length; i++) {
 				var m:ModuleDescriptor = sorted.getItemAt(i) as ModuleDescriptor;
-        if (m.getName() == "LayoutModule") {
-          startModule(m.getName());
-        }				
+				if (m.getName() == "LayoutModule") {
+					startModule(m.getName());
+				}
 			}
 		}
 

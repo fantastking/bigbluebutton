@@ -19,6 +19,7 @@
 
 package org.bigbluebutton.api.domain;
 
+import java.math.BigInteger;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -35,15 +36,24 @@ public class Recording {
 	private String startTime;
 	private String endTime;
 	private String numParticipants;
-	private Map<String, String> metadata = new TreeMap<String, String>();
-	private List<Playback> playbacks=new ArrayList<Playback>();
+	private String rawSize;
+	private Map<String, String> metadata = new TreeMap<>();
+	private List<Playback> playbacks=new ArrayList<>();
 	
 	//TODO: 
 	private String state;
 	private String playbackLink;
 	private String playbackFormat;
 	private String playbackDuration;
+	private String playbackSize;
+	private String processingTime;
 	private List<Extension> playbackExtensions;
+
+	private String downloadLink;
+	private String downloadFormat;
+	private String downloadMd5;
+	private String downloadKey;
+	private String downloadSize;
 
 	public static final String STATE_PROCESSING = "processing";
 	public static final String STATE_PROCESSED = "processed";
@@ -63,11 +73,11 @@ public class Recording {
 	}
 	
 	public String getState() {
-	    String state = this.state;
-	    if ( state == null || state.equals("") || state.equals("available") ) {
-	        state = isPublished()? STATE_PUBLISHED: STATE_UNPUBLISHED;
+	    String currentState = this.state;
+	    if ( currentState == null || "".equals(currentState) || "available".equals(currentState) ) {
+	        currentState = isPublished()? STATE_PUBLISHED: STATE_UNPUBLISHED;
 	    }
-		return state;
+		return currentState;
 	}
 	
 	public void setState(String state) {
@@ -106,6 +116,24 @@ public class Recording {
 		this.endTime = convertOldDateFormat(endTime);
 	}
 	
+	public String getSize() {
+		BigInteger size = BigInteger.ZERO;
+		for (Playback p: playbacks) {
+			if (p.getSize().length() > 0) {
+				size = size.add(new BigInteger(p.getSize()));
+			}
+		}
+		return size.toString();
+	}
+
+	public String getRawSize() {
+		return rawSize;
+	}
+
+	public void setRawSize(String rawSize) {
+		this.rawSize = rawSize;
+	}
+
 	public String getPlaybackLink() {
 		return playbackLink;
 	}
@@ -128,6 +156,22 @@ public class Recording {
 	
 	public void setPlaybackDuration(String playbackDuration) {
 		this.playbackDuration = playbackDuration;
+	}
+
+	public String getPlaybackSize() {
+		return playbackSize;
+	}
+
+	public void setPlaybackSize(String playbackSize) {
+		this.playbackSize = playbackSize;
+	}
+
+	public String getProcessingTime() {
+		return processingTime;
+	}
+
+	public void setProcessingTime(String processingTime) {
+		this.processingTime = processingTime;
 	}
 
 	public List<Extension> getPlaybackExtensions() {
@@ -208,6 +252,18 @@ public class Recording {
 		return newdate;
 	}
 	
+	public String getExternalMeetingId() {
+		String externalMeetingId = null;
+		if (this.metadata != null) {
+			externalMeetingId = this.metadata.get("meetingId");
+		}
+
+		if (externalMeetingId != null) {
+			return externalMeetingId;
+		} else {
+			return "";
+		}
+	}
 }
 
 /*

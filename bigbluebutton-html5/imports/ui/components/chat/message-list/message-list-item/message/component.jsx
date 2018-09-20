@@ -41,13 +41,15 @@ export default class MessageListItem extends Component {
     if (!this.ticking) {
       window.requestAnimationFrame(() => {
         const node = this.text;
-        const scrollArea = document.getElementById(this.props.chatAreaId);
+        const { scrollArea } = this.props;
 
         if (isElementInViewport(node)) {
           this.props.handleReadMessage(this.props.time);
-          eventsToBeBound.forEach(
-            e => scrollArea.removeEventListener(e, this.handleMessageInViewport),
-          );
+          if(scrollArea) {
+            eventsToBeBound.forEach(
+              e => scrollArea.removeEventListener(e, this.handleMessageInViewport),
+            );
+          }
         }
 
         this.ticking = false;
@@ -57,21 +59,27 @@ export default class MessageListItem extends Component {
     this.ticking = true;
   }
 
-  componentDidMount() {
+  // depending on whether the message is in viewport or not,
+  // either read it or attach a listener
+  listenToUnreadMessages() {
     if (!this.props.lastReadMessageTime > this.props.time) {
       return;
     }
 
     const node = this.text;
+    const { scrollArea } = this.props;
 
-    if (isElementInViewport(node)) {
+    if (isElementInViewport(node)) { // no need to listen, the message is already in viewport
       this.props.handleReadMessage(this.props.time);
-    } else {
-      const scrollArea = document.getElementById(this.props.chatAreaId);
+    } else if (scrollArea) {
       eventsToBeBound.forEach(
-        e => scrollArea.addEventListener(e, this.handleMessageInViewport, false),
+        (e) => { scrollArea.addEventListener(e, this.handleMessageInViewport, false); },
       );
     }
+  }  
+
+  componentDidMount() {
+    this.listenToUnreadMessages();
   }
 
   componentWillUnmount() {
@@ -79,10 +87,17 @@ export default class MessageListItem extends Component {
       return;
     }
 
-    const scrollArea = document.getElementById(this.props.chatAreaId);
-    eventsToBeBound.forEach(
-      e => scrollArea.removeEventListener(e, this.handleMessageInViewport, false),
-    );
+    const { scrollArea } = this.props;
+
+    if (scrollArea) {
+      eventsToBeBound.forEach(
+        (e) => { scrollArea.removeEventListener(e, this.handleMessageInViewport, false); },
+      );
+    }
+  }
+
+  componentDidUpdate(prevProps) {
+    this.listenToUnreadMessages();
   }
 
   render() {

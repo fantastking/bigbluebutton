@@ -6,7 +6,7 @@ organization := "org.bigbluebutton"
 
 version := "0.0.1"
 
-scalaVersion  := "2.11.6"
+scalaVersion  := "2.12.6"
 
 scalacOptions ++= Seq(
   "-unchecked",
@@ -14,7 +14,7 @@ scalacOptions ++= Seq(
   "-Xlint",
   "-Ywarn-dead-code",
   "-language:_",
-  "-target:jvm-1.7",
+  "-target:jvm-1.8",
   "-encoding", "UTF-8"
 )
 
@@ -37,28 +37,64 @@ testOptions in Test += Tests.Argument(TestFrameworks.Specs2, "html", "console", 
 
 testOptions in Test += Tests.Argument(TestFrameworks.ScalaTest, "-h", "target/scalatest-reports")
 
+val akkaVersion  = "2.5.14"
+val scalaTestV  = "2.2.6"
+
+
 libraryDependencies ++= {
-  val akkaVersion  = "2.3.11"
   Seq(
-    "com.typesafe.akka"        %%  "akka-actor"        % akkaVersion,
-    "com.typesafe.akka"        %%  "akka-testkit"      % akkaVersion    % "test",
-    "com.typesafe.akka" 	     %%  "akka-slf4j"        % akkaVersion,
-    "ch.qos.logback"    	      %  "logback-classic"   % "1.0.3",
-    "org.pegdown" 		      %  "pegdown"           % "1.4.0",
+    "ch.qos.logback"    	      %  "logback-classic"   % "1.2.3"       % "runtime",
     "junit" 				      %  "junit"             % "4.11",
-    "com.etaty.rediscala"      %%  "rediscala"         % "1.4.0",
-    "commons-codec"             %  "commons-codec"     % "1.10",
-    "joda-time"                 %  "joda-time"         % "2.3",
-    "com.google.code.gson"      %  "gson"              % "1.7.1",
-    "redis.clients"             %  "jedis"             % "2.1.0",
-    "org.apache.commons"        %  "commons-lang3"     % "3.2",
-    "org.bigbluebutton"         %  "bbb-common-message" % "0.0.18-SNAPSHOT",
-    "org.bigbluebutton"         %  "bbb-fsesl-client"   % "0.0.4"
+    "commons-codec"             %  "commons-codec"     % "1.11",
+    "joda-time"                 %  "joda-time"         % "2.10",
+    "org.apache.commons"        %  "commons-lang3"     % "3.7"
+
   )}
+
+libraryDependencies += "org.bigbluebutton" % "bbb-common-message_2.12" % "0.0.19-SNAPSHOT"
+
+libraryDependencies += "org.bigbluebutton"         %  "bbb-fsesl-client"   % "0.0.6"
+
+// https://mvnrepository.com/artifact/org.scala-lang/scala-library
+libraryDependencies += "org.scala-lang" % "scala-library" % scalaVersion.value
+// https://mvnrepository.com/artifact/org.scala-lang/scala-compiler
+libraryDependencies += "org.scala-lang" % "scala-compiler" % scalaVersion.value
+
+// https://mvnrepository.com/artifact/com.typesafe.akka/akka-actor_2.12
+libraryDependencies += "com.typesafe.akka" % "akka-actor_2.12" % akkaVersion
+
+// https://mvnrepository.com/artifact/com.typesafe.akka/akka-slf4j_2.12
+libraryDependencies += "com.typesafe.akka" % "akka-slf4j_2.12" % akkaVersion
+
+// https://mvnrepository.com/artifact/com.github.etaty/rediscala_2.12
+libraryDependencies += "com.github.etaty" % "rediscala_2.12" % "1.8.0"
+
+// For generating test reports
+libraryDependencies += "org.pegdown" % "pegdown" % "1.6.0" % "test"
+// https://mvnrepository.com/artifact/com.typesafe.akka/akka-testkit_2.12
+libraryDependencies += "com.typesafe.akka" % "akka-testkit_2.12" % "2.5.14" % "test"
+
+// https://mvnrepository.com/artifact/org.scalactic/scalactic_2.12
+libraryDependencies += "org.scalactic" % "scalactic_2.12" % "3.0.5" % "test"
+
+// https://mvnrepository.com/artifact/org.scalatest/scalatest_2.12
+libraryDependencies += "org.scalatest" % "scalatest_2.12" % "3.0.5" % "test"
+
+libraryDependencies += "org.mockito" % "mockito-core" % "2.21.0" % "test"
 
 seq(Revolver.settings: _*)
 
-scalariformSettings
+import com.typesafe.sbt.SbtScalariform
+
+import scalariform.formatter.preferences._
+import com.typesafe.sbt.SbtScalariform.ScalariformKeys
+
+SbtScalariform.defaultScalariformSettings
+
+ScalariformKeys.preferences := ScalariformKeys.preferences.value
+  .setPreference(AlignSingleLineCaseStatements, true)
+  .setPreference(DoubleIndentClassDeclaration, true)
+  .setPreference(AlignParameters, true)
 
 //-----------
 // Packaging
@@ -97,4 +133,4 @@ mappings in Universal <+= (packageBin in Compile, sourceDirectory ) map { (_, sr
     logConf -> "conf/logback.xml"
 }
 
-debianPackageDependencies in Debian ++= Seq("java7-runtime-headless", "bash")
+debianPackageDependencies in Debian ++= Seq("java8-runtime-headless", "bash")

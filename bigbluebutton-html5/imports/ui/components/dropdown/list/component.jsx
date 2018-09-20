@@ -1,28 +1,40 @@
 import React, { Component, Children, cloneElement } from 'react';
 import PropTypes from 'prop-types';
-import styles from './styles';
 import cx from 'classnames';
 import KEY_CODES from '/imports/utils/keyCodes';
+import { styles } from './styles';
 import ListItem from './item/component';
 import ListSeparator from './separator/component';
 import ListTitle from './title/component';
 
 const propTypes = {
+  /*  We should recheck this proptype, sometimes we need to create an container and send to dropdown,
+   but with this */
+  // proptype, is not possible.
   children: PropTypes.arrayOf((propValue, key, componentName, location, propFullName) => {
     if (propValue[key].type !== ListItem &&
-        propValue[key].type !== ListSeparator &&
-        propValue[key].type !== ListTitle) {
-      return new Error(
-        `Invalid prop \`${propFullName}\` supplied to` +
-        ` \`${componentName}\`. Validation failed.`,
-      );
+      propValue[key].type !== ListSeparator &&
+      propValue[key].type !== ListTitle) {
+      return new Error(`Invalid prop \`${propFullName}\` supplied to` +
+        ` \`${componentName}\`. Validation failed.`);
     }
-  }),
+    return true;
+  }).isRequired,
+
+  horizontal: PropTypes.bool,
+};
+
+const defaultProps = {
+  horizontal: false,
 };
 
 export default class DropdownList extends Component {
   constructor(props) {
     super(props);
+    this.state = {
+      focusedIndex: false,
+    };
+
     this.childrenRefs = [];
     this.menuRefs = [];
     this.handleItemKeyDown = this.handleItemKeyDown.bind(this);
@@ -30,50 +42,55 @@ export default class DropdownList extends Component {
   }
 
   componentDidMount() {
-    this._menu.addEventListener('keydown', event=>this.handleItemKeyDown(event));
+    this._menu.addEventListener('keydown', event => this.handleItemKeyDown(event));
   }
-  
-  componentWillMount() {
-    this.setState({
-      focusedIndex: 0,
-    });
-  }
-  
-  componentDidUpdate(prevProps, prevState) {
-    let { focusedIndex } = this.state;
 
-    this.menuRefs = [];
+  componentDidUpdate() {
+    const { focusedIndex } = this.state;
 
-    for (let i = 0; i < (this._menu.children.length); i++) {
-      if (this._menu.children[i].getAttribute("role") === 'menuitem') {
-        this.menuRefs.push(this._menu.children[i]);
-      }
-    }
+    const children = [].slice.call(this._menu.children);
+    this.menuRefs = children.filter(child => child.getAttribute('role') === 'menuitem');
 
     const activeRef = this.menuRefs[focusedIndex];
-      
+
     if (activeRef) {
       activeRef.focus();
     }
   }
 
   handleItemKeyDown(event, callback) {
-    const { onActionsHide, getDropdownMenuParent, } = this.props;
-    let nextFocusedIndex = this.state.focusedIndex;
+    const { getDropdownMenuParent } = this.props;
+    const { focusedIndex } = this.state;
 
-    if (KEY_CODES.ARROW_UP === event.which) {
+    let nextFocusedIndex = focusedIndex > 0 ? focusedIndex : 0;
+
+    if (focusedIndex === false) {
+      nextFocusedIndex = this.menuRefs.indexOf(document.activeElement);
+    }
+
+    const isHorizontal = this.props.horizontal;
+    const navigationKeys = {
+      previous: KEY_CODES[`ARROW_${isHorizontal ? 'LEFT' : 'UP'}`],
+      next: KEY_CODES[`ARROW_${isHorizontal ? 'RIGHT' : 'DOWN'}`],
+      click: isHorizontal ? [KEY_CODES.ENTER] : [KEY_CODES.ENTER, KEY_CODES.ARROW_RIGHT],
+      close: [KEY_CODES.ESCAPE,
+        KEY_CODES.TAB,
+        KEY_CODES[`ARROW_${isHorizontal ? 'DOWN' : 'LEFT'}`]],
+    };
+
+    if (navigationKeys.previous === event.which) {
       event.stopPropagation();
 
       nextFocusedIndex -= 1;
 
       if (nextFocusedIndex < 0) {
         nextFocusedIndex = this.menuRefs.length - 1;
-      }else if (nextFocusedIndex > this.menuRefs.length - 1) {
+      } else if (nextFocusedIndex > this.menuRefs.length - 1) {
         nextFocusedIndex = 0;
       }
     }
 
-    if ([KEY_CODES.ARROW_DOWN].includes(event.keyCode)) {
+    if ([navigationKeys.next].includes(event.keyCode)) {
       event.stopPropagation();
 
       nextFocusedIndex += 1;
@@ -83,37 +100,38 @@ export default class DropdownList extends Component {
       }
     }
 
-    if ([KEY_CODES.ENTER, KEY_CODES.ARROW_RIGHT].includes(event.keyCode)) {
+    if (navigationKeys.click.includes(event.keyCode)) {
+      nextFocusedIndex = false;
       event.stopPropagation();
       document.activeElement.firstChild.click();
     }
 
-    if ([KEY_CODES.ESCAPE, KEY_CODES.TAB, KEY_CODES.ARROW_LEFT].includes(event.keyCode)) {
+    if (navigationKeys.close.includes(event.keyCode)) {
+      nextFocusedIndex = false;
       const { dropdownHide } = this.props;
-          
+
       event.stopPropagation();
       event.preventDefault();
-          
+
       dropdownHide();
       if (getDropdownMenuParent) {
         getDropdownMenuParent().focus();
       }
     }
 
-    this.setState({focusedIndex: nextFocusedIndex});
-    
+    this.setState({ focusedIndex: nextFocusedIndex });
+
     if (typeof callback === 'function') {
       callback(event);
     }
   }
 
   handleItemClick(event, callback) {
-    const { getDropdownMenuParent,  onActionsHide} = this.props;
-    const { dropdownHide } = this.props;
+    const { getDropdownMenuParent, onActionsHide, dropdownHide } = this.props;
 
-    if ( getDropdownMenuParent ) {
+    if (getDropdownMenuParent) {
       onActionsHide();
-    }else{
+    } else {
       this.setState({ focusedIndex: null });
       dropdownHide();
     }
@@ -126,8 +144,9 @@ export default class DropdownList extends Component {
   render() {
     const { children, style, className } = this.props;
 
-    const boundChildren = Children.map(children,
-      (item, i) => {
+    const boundChildren = Children.map(
+      children,
+      (item) => {
         if (item.type === ListSeparator) {
           return item;
         }
@@ -151,17 +170,25 @@ export default class DropdownList extends Component {
             this.handleItemKeyDown(event, onKeyDown);
           },
         });
-      });
+      },
+    );
 
+    const listDirection = this.props.horizontal ? styles.horizontalList : styles.verticalList;
     return (
-      <ul 
-        style={style} 
-        className={cx(styles.list, className)} 
-        role="menu" ref={(r) => this._menu = r}>
-          {boundChildren}
+      <ul
+        style={style}
+        className={cx(listDirection, className)}
+        role="menu"
+        ref={(menu) => {
+          this._menu = menu;
+          return menu;
+        }}
+      >
+        {boundChildren}
       </ul>
     );
   }
 }
 
 DropdownList.propTypes = propTypes;
+DropdownList.defaultProps = defaultProps;

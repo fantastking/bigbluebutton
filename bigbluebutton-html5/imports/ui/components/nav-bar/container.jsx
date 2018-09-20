@@ -1,33 +1,26 @@
-import React, { Component } from 'react';
-import PropTypes from 'prop-types';
-import { createContainer } from 'meteor/react-meteor-data';
+import React from 'react';
+import { Meteor } from 'meteor/meteor';
+import { withTracker } from 'meteor/react-meteor-data';
 import { withRouter } from 'react-router';
 import Meetings from '/imports/api/meetings';
 import Auth from '/imports/ui/services/auth';
+import { meetingIsBreakout } from '/imports/ui/components/app/service';
 import userListService from '../user-list/service';
 import ChatService from '../chat/service';
 import Service from './service';
-import { meetingIsBreakout } from '/imports/ui/components/app/service';
 import NavBar from './component';
 
-const CHAT_CONFIG = Meteor.settings.public.chat;
-const PUBLIC_CHAT_KEY = CHAT_CONFIG.public_id;
+const PUBLIC_CONFIG = Meteor.settings.public;
+const PUBLIC_GROUP_CHAT_ID = PUBLIC_CONFIG.chat.public_group_id;
+const CLIENT_TITLE = PUBLIC_CONFIG.app.clientTitle;
 
-class NavBarContainer extends Component {
-  constructor(props) {
-    super(props);
-  }
+const NavBarContainer = ({ children, ...props }) => (
+  <NavBar {...props}>
+    {children}
+  </NavBar>
+);
 
-  render() {
-    return (
-      <NavBar {...this.props}>
-        {this.props.children}
-      </NavBar>
-    );
-  }
-}
-
-export default withRouter(createContainer(({ location, router }) => {
+export default withRouter(withTracker(({ location, router }) => {
   let meetingTitle;
   let meetingRecorded;
 
@@ -37,8 +30,9 @@ export default withRouter(createContainer(({ location, router }) => {
   });
 
   if (meetingObject != null) {
-    meetingTitle = meetingObject.meetingName;
-    meetingRecorded = meetingObject.currentlyBeingRecorded;
+    meetingTitle = meetingObject.meetingProp.name;
+    meetingRecorded = meetingObject.recordProp;
+    document.title = `${CLIENT_TITLE} - ${meetingTitle}`;
   }
 
   const checkUnreadMessages = () => {
@@ -51,7 +45,7 @@ export default withRouter(createContainer(({ location, router }) => {
     return users
       .map(user => user.id)
       .filter(userID => userID !== Auth.userID)
-      .concat(PUBLIC_CHAT_KEY)
+      .concat(PUBLIC_GROUP_CHAT_ID)
       .some(receiverID => ChatService.hasUnreadMessages(receiverID));
   };
 
@@ -65,7 +59,6 @@ export default withRouter(createContainer(({ location, router }) => {
     breakouts,
     currentUserId,
     meetingId,
-    getBreakoutJoinURL: Service.getBreakoutJoinURL,
     presentationTitle: meetingTitle,
     hasUnreadMessages: checkUnreadMessages(),
     isBreakoutRoom: meetingIsBreakout(),
@@ -78,4 +71,4 @@ export default withRouter(createContainer(({ location, router }) => {
       }
     },
   };
-}, NavBarContainer));
+})(NavBarContainer));

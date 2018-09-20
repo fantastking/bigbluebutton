@@ -1,5 +1,5 @@
-@import "../../stylesheets/variables/_all";
-@import "../../stylesheets/mixins/_scrollable";
+@import "/imports/ui/stylesheets/variables/_all";
+@import "/imports/ui/stylesheets/mixins/_scrollable";
 
 $dropdown-bg: $color-white;
 $dropdown-color: $color-text;
@@ -10,6 +10,10 @@ $dropdown-caret-height: 8px;
 
 .dropdown {
   position: relative;
+
+  &:focus {
+    outline: none;
+  }
 }
 
 .content {
@@ -73,12 +77,14 @@ $dropdown-caret-height: 8px;
 .close {
   display: none;
   position: fixed;
-  bottom: 1rem;
+  bottom: 0.8rem;
+  border-radius: 0;
   z-index: 1011;
   font-size: $font-size-large * 1.1;
   width: calc(100% - #{($line-height-computed * 2)});
   left: $line-height-computed;
-  box-shadow: 0 0 0 2rem #fff;
+  box-shadow: 0 0 0 2rem $color-white !important;
+  border: $color-white !important;
 
   @include mq($small-only) {
     display: block;
@@ -167,6 +173,7 @@ $dropdown-caret-height: 8px;
 
 %horz-center-caret {
   &:after, &:before {
+    left: 50%;
     margin-left: -($dropdown-caret-width);
   }
 }
@@ -223,6 +230,11 @@ $dropdown-caret-height: 8px;
 .top-left {
   @extend %down-caret;
   @extend %horz-right-caret;
+  min-width: 11.5rem;
+
+  @include mq($small-only) {
+    width: auto;
+  }
 }
 
 .top-right {
@@ -243,6 +255,11 @@ $dropdown-caret-height: 8px;
 .bottom-right {
   @extend %up-caret;
   @extend %horz-left-caret;
+  min-width: 9rem;
+
+  @include mq($small-only) {
+    width: auto;
+  }
 }
 
 .left {

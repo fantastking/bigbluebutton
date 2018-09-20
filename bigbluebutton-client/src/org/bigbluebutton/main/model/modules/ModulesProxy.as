@@ -20,8 +20,8 @@ package org.bigbluebutton.main.model.modules
 {
 	import org.as3commons.logging.api.ILogger;
 	import org.as3commons.logging.api.getClassLogger;
+	import org.bigbluebutton.core.BBB;
 	import org.bigbluebutton.core.UsersUtil;
-	import org.bigbluebutton.main.model.ConferenceParameters;
 	import org.bigbluebutton.main.model.PortTestProxy;
 	
 	public class ModulesProxy {
@@ -47,10 +47,10 @@ package org.bigbluebutton.main.model.modules
             var logData:Object = UsersUtil.initLogData();
             logData.tags = ["initialization"];
             logData.tunnel = tunnel;
-            logData.message = "Successfully tested connection to server.";
+            logData.logCode = "port_test_done";
             LOGGER.info(JSON.stringify(logData));
                 
-			modulesManager.useProtocol(tunnel);
+						BBB.initConnectionManager().useProtocol(tunnel);
 			modulesManager.startUserServices();
 		}
 						
@@ -59,15 +59,15 @@ package org.bigbluebutton.main.model.modules
 		}
 		
 		public function getPortTestHost():String {
-			return modulesManager.portTestHost;
+			return BBB.initConnectionManager().portTestHost;
 		}
 		
 		public function getPortTestApplication():String {
-			return modulesManager.portTestApplication;
+			return BBB.initConnectionManager().portTestApplication;
 		}
 
 		public function getPortTestTimeout():Number {
-			return modulesManager.portTestTimeout;
+			return BBB.initConnectionManager().portTestTimeout;
 		}
 		
 		public function handleConfigLoaded():void {
@@ -79,20 +79,20 @@ package org.bigbluebutton.main.model.modules
 		}
 		
 		public function testRTMP():void{
-			portTestProxy.connect(false /*"RTMP"*/, getPortTestHost(), "1935", getPortTestApplication(), getPortTestTimeout());
+			portTestProxy.connect(false /*tunnel*/, getPortTestHost(), "", getPortTestApplication(), getPortTestTimeout());
 		}
-		
-		public function testRTMPT(tunnel:Boolean):void{
-			if (! tunnel) {
-        // Try to test using rtmpt as rtmp failed.
-        portTestProxy.connect(true /*"RTMPT"*/, getPortTestHost(), "", getPortTestApplication(), getPortTestTimeout());
-      } else {
-        modulesDispatcher.sendTunnelingFailedEvent(getPortTestHost(), getPortTestApplication());
-      }
+
+		public function testRTMPT(tunnel:Boolean):void {
+			if (!tunnel) {
+				// Try to test using rtmpt as rtmp failed.
+				portTestProxy.connect(true /*tunnel*/, getPortTestHost(), "", getPortTestApplication(), getPortTestTimeout());
+			} else {
+				modulesDispatcher.sendTunnelingFailedEvent(getPortTestHost(), getPortTestApplication());
+			}
 		}
-		
-		public function loadAllModules(params:ConferenceParameters):void{
-			modulesManager.loadAllModules(params);
+
+		public function loadAllModules():void{
+			modulesManager.loadAllModules();
 		}
 		
 		public function handleLogout():void {

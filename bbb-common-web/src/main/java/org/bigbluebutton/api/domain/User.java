@@ -32,20 +32,33 @@ public class User {
 	private String role;
 	private String avatarURL;
 	private Map<String,String> status;
+	private Boolean guest;
+	private String  guestStatus;
 	private Boolean listeningOnly = false;
 	private Boolean voiceJoined = false;
+	private String clientType;
 	private List<String> streams;
-	
-	public User(String internalUserId, String externalUserId, String fullname, String role, String avatarURL) {
+
+	public User(String internalUserId,
+							String externalUserId,
+							String fullname,
+							String role,
+							String avatarURL,
+							Boolean guest,
+							String  guestStatus,
+							String clientType) {
 		this.internalUserId = internalUserId;
 		this.externalUserId = externalUserId;
 		this.fullname = fullname;
 		this.role = role;
 		this.avatarURL = avatarURL;
-		this.status = new ConcurrentHashMap<String, String>();
+		this.guest = guest;
+		this.guestStatus = guestStatus;
+		this.status = new ConcurrentHashMap<>();
 		this.streams = Collections.synchronizedList(new ArrayList<String>());
+		this.clientType = clientType;
 	}
-	
+
 	public String getInternalUserId() {
 		return this.internalUserId;
 	}
@@ -59,6 +72,22 @@ public class User {
 	
 	public void setExternalUserId(String externalUserId){
 		this.externalUserId = externalUserId;
+	}
+
+	public void setGuest(Boolean guest) {
+		this.guest = guest;
+	}
+
+	public Boolean isGuest() {
+		return this.guest;
+	}
+
+	public void setGuestStatus(String guestStatus) {
+		this.guestStatus = guestStatus;
+	}
+
+	public String getGuestStatus() {
+		return this.guestStatus;
 	}
 	
 	public String getFullname() {
@@ -83,7 +112,7 @@ public class User {
 	}
 
 	public boolean isModerator() {
-		return this.role.equalsIgnoreCase("MODERATOR");
+		return "MODERATOR".equalsIgnoreCase(this.role);
 	}
 	
 	public void setStatus(String key, String value){
@@ -99,7 +128,7 @@ public class User {
 	public boolean isPresenter() {
 		String isPresenter = this.status.get("presenter");
 		if (isPresenter != null) {
-			return isPresenter.equalsIgnoreCase("true");
+			return "true".equalsIgnoreCase(isPresenter);
 		}
 		return false;
 	}
@@ -116,9 +145,9 @@ public class User {
 		return streams;
 	}
 
-        public Boolean hasVideo() {
-                return this.getStreams().size() > 0;
-        }
+    public Boolean hasVideo() {
+        return !this.getStreams().isEmpty();
+    }
 
 	public Boolean isListeningOnly() {
 		return listeningOnly;
@@ -135,4 +164,9 @@ public class User {
 	public void setVoiceJoined(Boolean voiceJoined) {
 		this.voiceJoined = voiceJoined;
 	}
+
+	public String getClientType() {
+		return this.clientType;
+	}
+
 }

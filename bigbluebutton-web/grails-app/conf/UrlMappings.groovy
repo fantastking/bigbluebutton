@@ -1,8 +1,12 @@
 class UrlMappings {
 
 	static mappings = {
-		"/presentation/upload"(controller:"presentation") {
+		"/presentation/$authzToken/upload"(controller:"presentation") {
 			action = [POST:'upload']
+		}
+
+		"/presentation/checkPresentation"(controller:"presentation") {
+			action = [GET:'checkPresentationBeforeUploading']
 		}
 
 		"/presentation/test-convert"(controller:"presentation") {
@@ -25,6 +29,10 @@ class UrlMappings {
 			action = [GET:'showThumbnail']
 		}
 
+		"/presentation/$conference/$room/$presentation_name/png/$id"(controller:"presentation") {
+			action = [GET:'showPng']
+		}
+
 		"/presentation/$conference/$room/$presentation_name/svgs"(controller:"presentation") {
 			action = [GET:'numberOfSvgs']
 		}
@@ -39,6 +47,10 @@ class UrlMappings {
   
 		"/presentation/$conference/$room/$presentation_name/textfiles/$id"(controller:"presentation") {
 			action = [GET:'showTextfile']
+		}
+
+		"/presentation/download/$meetingId/$presId"(controller:"presentation") {
+			action = [GET:'downloadFile']
 		}
       
 		"/api/setConfigXML"(controller:"api") {
@@ -63,6 +75,18 @@ class UrlMappings {
 
 		"/api/updateRecordings"(controller:"api") {
 			action = [GET:'updateRecordingsHandler', POST:'updateRecordingsHandler']
+		}
+
+		"/api/guestWait"(controller:"api") {
+			action = [GET: 'guestWaitHandler']
+		}
+
+		"/api/getRecordingTextTracks"(controller:"recording") {
+			action = [GET:'getRecordingTextTracks']
+		}
+
+		"/api/putRecordingTextTrack"(controller:"recording") {
+			action = [POST:'putRecordingTextTrack']
 		}
 
 		"/$controller/$action?/$id?(.${format})?"{

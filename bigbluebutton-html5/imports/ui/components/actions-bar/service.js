@@ -1,11 +1,11 @@
-import React from 'react';
-import Auth from '/imports/ui/services/auth/index.js';
+import Auth from '/imports/ui/services/auth';
 import Users from '/imports/api/users';
-
-const isUserPresenter = () => Users.findOne({
-  userId: Auth.userID,
-}).user.presenter;
+import { makeCall } from '/imports/ui/services/api';
+import Meetings from '/imports/api/meetings';
 
 export default {
-  isUserPresenter,
+  isUserPresenter: () => Users.findOne({ userId: Auth.userID }).presenter,
+  isUserModerator: () => Users.findOne({ userId: Auth.userID }).moderator,
+  recordSettingsList: () => Meetings.findOne({ meetingId: Auth.meetingID }).recordProp,
+  toggleRecording: () => makeCall('toggleRecording'),
 };

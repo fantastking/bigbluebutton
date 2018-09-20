@@ -1,27 +1,35 @@
-import React, { Component, cloneElement } from 'react';
-import PropTypes from 'prop-types';
-import { createContainer } from 'meteor/react-meteor-data';
+import React, { cloneElement } from 'react';
+import { withTracker } from 'meteor/react-meteor-data';
 import { withRouter } from 'react-router';
 import { defineMessages, injectIntl } from 'react-intl';
-
-import {
-  getFontSize,
-  getCaptionsStatus,
-} from './service';
-
-import { withModalMounter } from '../modal/service';
-
+import PropTypes from 'prop-types';
 import Auth from '/imports/ui/services/auth';
 import Users from '/imports/api/users';
 import Breakouts from '/imports/api/breakouts';
 import Meetings from '/imports/api/meetings';
+import logger from '/imports/startup/client/logger';
+
+import ClosedCaptionsContainer from '/imports/ui/components/closed-captions/container';
+
+import {
+  getFontSize,
+  getCaptionsStatus,
+  meetingIsBreakout,
+} from './service';
+
+import { withModalMounter } from '../modal/service';
 
 import App from './component';
 import NavBarContainer from '../nav-bar/container';
 import ActionsBarContainer from '../actions-bar/container';
 import MediaContainer from '../media/container';
-import AudioModalContainer from '../audio/audio-modal/component';
-import ClosedCaptionsContainer from '/imports/ui/components/closed-captions/container';
+
+const propTypes = {
+  navbar: PropTypes.node,
+  actionsbar: PropTypes.node,
+  media: PropTypes.node,
+  location: PropTypes.shape({}).isRequired,
+};
 
 const defaultProps = {
   navbar: <NavBarContainer />,
@@ -30,61 +38,69 @@ const defaultProps = {
 };
 
 const intlMessages = defineMessages({
-  kickedMessage: {
-    id: 'app.error.kicked',
-    description: 'Message when the user is kicked out of the meeting',
-  },
-
-  endMeetingMessage: {
-    id: 'app.error.meeting.ended',
-    description: 'You have logged out of the conference',
+  waitingApprovalMessage: {
+    id: 'app.guest.waiting',
+    description: 'Message while a guest is waiting to be approved',
   },
 });
 
-class AppContainer extends Component {
-  render() {
-    // inject location on the navbar container
-    const navbarWithLocation = cloneElement(this.props.navbar, { location: this.props.location });
+const AppContainer = (props) => {
+  // inject location on the navbar container
+  const {
+    navbar,
+    actionsbar,
+    media,
+    ...otherProps
+  } = props;
 
-    return (
-      <App {...this.props} navbar={navbarWithLocation}>
-        {this.props.children}
-      </App>
-    );
+  const navbarWithLocation = cloneElement(navbar, { location: props.location });
+
+  return (
+    <App
+      navbar={navbarWithLocation}
+      actionsbar={actionsbar}
+      media={media}
+      {...otherProps}
+    />
+  );
+};
+
+
+export default withRouter(injectIntl(withModalMounter(withTracker(({ router, intl, baseControls }) => {
+  const currentUser = Users.findOne({ userId: Auth.userID });
+  const isMeetingBreakout = meetingIsBreakout();
+
+  if (!currentUser.approved) {
+    baseControls.updateLoadingState(intl.formatMessage(intlMessages.waitingApprovalMessage));
   }
-}
 
-export default withRouter(injectIntl(withModalMounter(createContainer((
-  { router, intl, mountModal, baseControls }) => {
+  logger.info('User joined meeting and subscribed to data successfully');
 
-  // Displayed error messages according to the mode (kicked, end meeting)
-  let sendToError = (code, message) => {
-    Auth.clearCredentials()
-        .then(() => {
-          router.push(`/error/${code}`);
-          baseControls.updateErrorState(message);
-        });
-  };
-
-  // Check if user is kicked out of the session
+  // Check if user is removed out of the session
   Users.find({ userId: Auth.userID }).observeChanges({
     changed(id, fields) {
-      if (fields.user && fields.user.kicked) {
-        sendToError(403, intl.formatMessage(intlMessages.kickedMessage));
+      const hasNewConnection = 'connectionId' in fields && (fields.connectionId !== Meteor.connection._lastSessionId);
+
+      if (fields.ejected || hasNewConnection) {
+        router.push(`/ended/${403}`);
       }
     },
   });
 
-  // forcelly logged out when the meeting is ended
+  // forcefully log out when the meeting ends
   Meetings.find({ meetingId: Auth.meetingID }).observeChanges({
-    removed(old) {
-      sendToError(410, intl.formatMessage(intlMessages.endMeetingMessage));
+    removed() {
+      if (isMeetingBreakout) {
+        Auth.clearCredentials().then(window.close);
+      } else {
+        router.push(`/ended/${410}`);
+      }
     },
   });
 
-  // Close the widow when the current breakout room ends
-  Breakouts.find({ breakoutMeetingId: Auth.meetingID }).observeChanges({
-    removed(old) {
+  // Close the window when the current breakout room ends
+  Breakouts.find({ breakoutId: Auth.meetingID }).observeChanges({
+    removed() {
       Auth.clearCredentials().then(window.close);
     },
   });
@@ -92,7 +108,10 @@ export default withRouter(injectIntl(withModalMounter(createContainer((
   return {
     closedCaption: getCaptionsStatus() ? <ClosedCaptionsContainer /> : null,
     fontSize: getFontSize(),
+    userlistIsOpen: window.location.pathname.includes('users'),
+    chatIsOpen: window.location.pathname.includes('chat'),
   };
-}, AppContainer))));
+})(AppContainer))));
 
 AppContainer.defaultProps = defaultProps;
+AppContainer.propTypes = propTypes;
