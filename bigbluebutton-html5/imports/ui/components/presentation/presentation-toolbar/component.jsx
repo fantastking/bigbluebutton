@@ -4,12 +4,13 @@ import { defineMessages, injectIntl, FormattedMessage } from 'react-intl';
 import browser from 'browser-detect';
 import injectWbResizeEvent from '/imports/ui/components/presentation/resize-wrapper/component';
 import Button from '/imports/ui/components/button/component';
+import { HUNDRED_PERCENT, MAX_PERCENT, STEP } from '/imports/utils/slideCalcUtils';
+import cx from 'classnames';
 import { styles } from './styles.scss';
 import ZoomTool from './zoom-tool/component';
-
-const STEP = 5;
-const HUNDRED_PERCENT = 100;
-const MAX_PERCENT = 400;
+import FullscreenButton from '../../video-provider/fullscreen-button/component';
+import Tooltip from '/imports/ui/components/tooltip/component';
+import KEY_CODES from '/imports/utils/keyCodes';
 
 const intlMessages = defineMessages({
   previousSlideLabel: {
@@ -24,12 +25,28 @@ const intlMessages = defineMessages({
     id: 'app.presentation.presentationToolbar.goToSlide',
     description: 'button for slide select',
   },
+  selectLabel: {
+    id: 'app.presentation.presentationToolbar.selectLabel',
+    description: 'slide select label',
+  },
+  fitToWidth: {
+    id: 'app.presentation.presentationToolbar.fitToWidth',
+    description: 'button for fit to width',
+  },
+  fitToPage: {
+    id: 'app.presentation.presentationToolbar.fitToPage',
+    description: 'button label for fit to width',
+  },
+  presentationLabel: {
+    id: 'app.presentationUploder.title',
+    description: 'presentation area element label',
+  },
 });
 
 class PresentationToolbar extends Component {
   static renderAriaLabelsDescs() {
     return (
-      <div hidden >
+      <div hidden>
         {/* Previous Slide button aria */}
         <div id="prevSlideLabel">
           <FormattedMessage
@@ -128,39 +145,56 @@ class PresentationToolbar extends Component {
   constructor(props) {
     super(props);
 
-    this.state = { sliderValue: 100 };
+    this.state = {
+      sliderValue: 100,
+    };
     this.handleValuesChange = this.handleValuesChange.bind(this);
     this.handleSkipToSlideChange = this.handleSkipToSlideChange.bind(this);
     this.change = this.change.bind(this);
+    this.switchSlide = this.switchSlide.bind(this);
     this.setInt = 0;
   }
 
+  componentDidMount() {
+    document.addEventListener('keydown', this.switchSlide);
+  }
+
+  componentWillUnmount() {
+    document.removeEventListener('keydown', this.switchSlide);
+  }
+
+  switchSlide(event) {
+    const { target, which } = event;
+    const isBody = target.nodeName === 'BODY';
+    const { actions } = this.props;
+
+    if (isBody) {
+      if ([KEY_CODES.ARROW_LEFT].includes(which)) {
+        actions.previousSlideHandler();
+      }
+      if ([KEY_CODES.ARROW_RIGHT].includes(which)) {
+        actions.nextSlideHandler();
+      }
+    }
+  }
+
   handleSkipToSlideChange(event) {
-    const requestedSlideNum = parseInt(event.target.value, 10);
-    this.props.actions.skipToSlideHandler(requestedSlideNum);
+    const { actions } = this.props;
+    const requestedSlideNum = Number.parseInt(event.target.value, 10);
+    actions.skipToSlideHandler(requestedSlideNum);
   }
 
   handleValuesChange(event) {
+    const { sliderValue } = this.state;
     this.setState(
       { sliderValue: event.target.value },
-      () => this.handleZoom(this.state.sliderValue),
+      () => this.handleZoom(sliderValue),
     );
   }
 
-  fitToWidthClickHandler() {
-    this.setState({
-      fitToWidthValue: 'not_implemented_yet',
-    });
-  }
-
-  fitToScreenClickHandler() {
-    this.setState({
-      fitToScreenValue: 'not_implemented_yet',
-    });
-  }
-
   change(value) {
-    this.props.zoomChanger(value);
+    const { zoomChanger } = this.props;
+    zoomChanger(value);
   }
 
   renderSkipSlideOpts(numberOfSlides) {
@@ -186,19 +220,27 @@ class PresentationToolbar extends Component {
     const {
       currentSlideNum,
       numberOfSlides,
+      fitToWidthHandler,
+      fitToWidth,
       actions,
       intl,
       zoom,
+      isFullscreen,
+      fullscreenRef,
     } = this.props;
 
     const BROWSER_RESULTS = browser();
-    const isMobileBrowser = BROWSER_RESULTS.mobile ||
-      BROWSER_RESULTS.os.includes('Android');
+    const isMobileBrowser = BROWSER_RESULTS.mobile
+      || BROWSER_RESULTS.os.includes('Android');
+
+    const tooltipDistance = 35;
+
     return (
       <div id="presentationToolbarWrapper" className={styles.presentationToolbarWrapper}>
         {PresentationToolbar.renderAriaLabelsDescs()}
+        {<div />}
         {
-          <span className={styles.presentationControls}>
+          <div className={styles.presentationSlideControls}>
             <Button
               role="button"
               aria-labelledby="prevSlideLabel"
@@ -210,21 +252,33 @@ class PresentationToolbar extends Component {
               onClick={actions.previousSlideHandler}
               label={intl.formatMessage(intlMessages.previousSlideLabel)}
               hideLabel
-              className={styles.prevSlide}
+              className={cx(styles.prevSlide, styles.presentationBtn)}
+              tooltipDistance={tooltipDistance}
             />
-            <select
-              // <select> has an implicit role of listbox, no need to define role="listbox" explicitly
-              id="skipSlide"
-              aria-labelledby="skipSlideLabel"
-              aria-describedby="skipSlideDesc"
-              aria-live="polite"
-              aria-relevant="all"
-              value={currentSlideNum}
-              onChange={actions.skipToSlideHandler}
-              className={styles.skipSlideSelect}
+
+            <Tooltip
+              tooltipDistance={tooltipDistance}
+              title={intl.formatMessage(intlMessages.selectLabel)}
+              className={styles.presentationBtn}
             >
-              {this.renderSkipSlideOpts(numberOfSlides)}
-            </select>
+              <select
+                role="button"
+                /*
+                <select> has an implicit role of listbox, no need to define
+                role="listbox" explicitly
+                */
+                id="skipSlide"
+                aria-labelledby="skipSlideLabel"
+                aria-describedby="skipSlideDesc"
+                aria-live="polite"
+                aria-relevant="all"
+                value={currentSlideNum}
+                onChange={this.handleSkipToSlideChange}
+                className={styles.skipSlideSelect}
+              >
+                {this.renderSkipSlideOpts(numberOfSlides)}
+              </select>
+            </Tooltip>
             <Button
               role="button"
               aria-labelledby="nextSlideLabel"
@@ -236,49 +290,58 @@ class PresentationToolbar extends Component {
               onClick={actions.nextSlideHandler}
               label={intl.formatMessage(intlMessages.nextSlideLabel)}
               hideLabel
-              className={styles.skipSlide}
+              className={cx(styles.skipSlide, styles.presentationBtn)}
+              tooltipDistance={tooltipDistance}
             />
-          </span>
+          </div>
         }
         {
-          !isMobileBrowser ?
-            <span className={styles.zoomWrapper}>
-              <ZoomTool
-                value={zoom}
-                change={this.change}
-                minBound={HUNDRED_PERCENT}
-                maxBound={MAX_PERCENT}
-                step={STEP}
-              />
-            </span>
-            : null
+          <div className={styles.presentationZoomControls}>
+            {
+              !isMobileBrowser
+                ? (
+                  <ZoomTool
+                    zoomValue={zoom}
+                    change={this.change}
+                    minBound={HUNDRED_PERCENT}
+                    maxBound={MAX_PERCENT}
+                    step={STEP}
+                    tooltipDistance={tooltipDistance}
+                  />
+                )
+                : null
+            }
+            <Button
+              role="button"
+              aria-labelledby="fitWidthLabel"
+              aria-describedby="fitWidthDesc"
+              color="default"
+              icon="fit_to_width"
+              size="md"
+              circle={false}
+              onClick={fitToWidthHandler}
+              label={fitToWidth
+                ? intl.formatMessage(intlMessages.fitToPage)
+                : intl.formatMessage(intlMessages.fitToWidth)
+              }
+              hideLabel
+              className={cx(styles.skipSlide, styles.presentationBtn)}
+              tooltipDistance={tooltipDistance}
+            />
+            {
+              !isFullscreen
+              && (
+                <FullscreenButton
+                  handleFullscreen={fullscreenRef}
+                  elementName={intl.formatMessage(intlMessages.presentationLabel)}
+                  tooltipDistance={tooltipDistance}
+                  dark
+                  className={styles.presentationBtn}
+                />
+              )
+            }
+          </div>
         }
-        {/* Fit to width button
-        <Button
-          role="button"
-          aria-labelledby="fitWidthLabel"
-          aria-describedby="fitWidthDesc"
-          color={'default'}
-          icon={'fit_to_width'}
-          size={'md'}
-          circle={false}
-          onClick={this.fitToWidthClickHandler}
-          label={'Fit to Width'}
-          hideLabel={true}
-        /> */}
-        {/* Fit to screen button
-        <Button
-          role="button"
-          aria-labelledby="fitScreenLabel"
-          aria-describedby="fitScreenDesc"
-          color={'default'}
-          icon={'fit_to_screen'}
-          size={'md'}
-          circle={false}
-          onClick={this.fitToScreenClickHandler}
-          label={'Fit to Screen'}
-          hideLabel={true}
-        /> */}
       </div>
     );
   }
@@ -298,6 +361,12 @@ PresentationToolbar.propTypes = {
   intl: PropTypes.shape({
     formatMessage: PropTypes.func.isRequired,
   }).isRequired,
+  zoomChanger: PropTypes.func.isRequired,
+  fitToWidthHandler: PropTypes.func.isRequired,
+  fitToWidth: PropTypes.bool.isRequired,
+  fullscreenRef: PropTypes.func.isRequired,
+  isFullscreen: PropTypes.bool.isRequired,
+  zoom: PropTypes.number.isRequired,
 };
 
 export default injectWbResizeEvent(injectIntl(PresentationToolbar));

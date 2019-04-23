@@ -4,14 +4,14 @@ import akka.actor.{ Actor, ActorLogging, Props }
 import org.bigbluebutton.SystemConfiguration
 import org.bigbluebutton.common2.msgs._
 import org.bigbluebutton.common2.util.JsonUtil
-import org.bigbluebutton.core.MessageSender
+import org.bigbluebutton.common2.redis.MessageSender
 
 object FromAkkaAppsMsgSenderActor {
   def props(msgSender: MessageSender): Props = Props(classOf[FromAkkaAppsMsgSenderActor], msgSender)
 }
 
 class FromAkkaAppsMsgSenderActor(msgSender: MessageSender)
-    extends Actor with ActorLogging with SystemConfiguration {
+  extends Actor with ActorLogging with SystemConfiguration {
 
   def receive = {
     case msg: BbbCommonEnvCoreMsg => handleBbbCommonEnvCoreMsg(msg)

@@ -4,6 +4,7 @@ import WhiteboardMultiUser from '/imports/api/whiteboard-multi-user/';
 import { AnnotationsStreamer } from '/imports/api/annotations';
 import addAnnotationQuery from '/imports/api/annotations/addAnnotation';
 import logger from '/imports/startup/client/logger';
+import { makeCall } from '/imports/ui/services/api';
 import { isEqual } from 'lodash';
 
 const Annotations = new Mongo.Collection(null);
@@ -32,24 +33,28 @@ function handleAddedAnnotation({
   }
 
   const fakeAnnotation = Annotations.findOne({ id: `${annotation.id}-fake` });
-  const fakePoints = fakeAnnotation.annotationInfo.points;
-  const { points: lastPoints } = annotation.annotationInfo;
+  let fakePoints;
 
-  if (annotation.annotationType !== 'pencil') {
-    Annotations.update(fakeAnnotation._id, {
-      $set: {
-        position: annotation.position,
-        'annotationInfo.color': isEqual(fakePoints, lastPoints) || annotation.status === DRAW_END ?
-          annotation.annotationInfo.color : fakeAnnotation.annotationInfo.color,
-      },
-      $inc: { version: 1 }, // TODO: Remove all this version stuff
-    });
-    return;
+  if (fakeAnnotation) {
+    fakePoints = fakeAnnotation.annotationInfo.points;
+    const { points: lastPoints } = annotation.annotationInfo;
+
+    if (annotation.annotationType !== 'pencil') {
+      Annotations.update(fakeAnnotation._id, {
+        $set: {
+          position: annotation.position,
+          'annotationInfo.color': isEqual(fakePoints, lastPoints) || annotation.status === DRAW_END ?
+            annotation.annotationInfo.color : fakeAnnotation.annotationInfo.color,
+        },
+        $inc: { version: 1 }, // TODO: Remove all this version stuff
+      });
+      return;
+    }
   }
 
   Annotations.upsert(query.selector, query.modifier, (err) => {
     if (err) {
-      logger.error(err);
+      logger.error({ logCode: 'whiteboard_annotation_upsert_error' }, err);
       return;
     }
 
@@ -118,7 +123,7 @@ function increaseBrightness(realHex, percent) {
   /* eslint-enable no-bitwise, no-mixed-operators */
 }
 
-let annotationsQueue = [];
+const annotationsQueue = [];
 // How many packets we need to have to use annotationsBufferTimeMax
 const annotationsMaxDelayQueueSize = 60;
 // Minimum bufferTime
@@ -127,7 +132,7 @@ const annotationsBufferTimeMin = 30;
 const annotationsBufferTimeMax = 200;
 let annotationsSenderIsRunning = false;
 
-const proccessAnnotationsQueue = () => {
+const proccessAnnotationsQueue = async () => {
   annotationsSenderIsRunning = true;
   const queueSize = annotationsQueue.length;
 
@@ -136,12 +141,11 @@ const proccessAnnotationsQueue = () => {
     return;
   }
 
+  const annotations = annotationsQueue.splice(0, queueSize);
+
   // console.log('annotationQueue.length', annotationsQueue, annotationsQueue.length);
-  AnnotationsStreamer.emit('publish', {
-    credentials: Auth.credentials,
-    payload: annotationsQueue.filter(({ id }) => !discardedList.includes(id)),
-  });
-  annotationsQueue = [];
+  await makeCall('sendBulkAnnotations', annotations.filter(({ id }) => !discardedList.includes(id)))
+
   // ask tiago
   const delayPerc =
     Math.min(annotationsMaxDelayQueueSize, queueSize) / annotationsMaxDelayQueueSize;

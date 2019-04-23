@@ -3,7 +3,6 @@ import Auth from '/imports/ui/services/auth';
 import BridgeService from './service';
 import { fetchWebRTCMappedStunTurnServers } from '/imports/utils/fetchStunTurnServers';
 import logger from '/imports/startup/client/logger';
-import { notify } from '/imports/ui/services/notification';
 
 const SFU_CONFIG = Meteor.settings.public.kurento;
 const SFU_URL = SFU_CONFIG.wsUrl;
@@ -14,8 +13,6 @@ const FIREFOX_SCREENSHARE_SOURCE = SFU_CONFIG.firefoxScreenshareSource;
 const SCREENSHARE_VIDEO_TAG = 'screenshareVideo';
 
 const CHROME_EXTENSION_KEY = CHROME_CUSTOM_EXTENSION_KEY === 'KEY' ? CHROME_DEFAULT_EXTENSION_KEY : CHROME_CUSTOM_EXTENSION_KEY;
-
-const ICE_CONNECTION_FAILED = 'ICE connection failed';
 
 const getUserId = () => Auth.userID;
 
@@ -56,10 +53,10 @@ export default class KurentoScreenshareBridge {
     try {
       iceServers = await fetchWebRTCMappedStunTurnServers(getSessionToken());
     } catch (error) {
-      logger.error('Screenshare bridge failed to fetch STUN/TURN info, using default');
+      logger.error({ logCode: 'kurentowatchvideo_fetchstunturninfo_error' }, 'Screenshare bridge failed to fetch STUN/TURN info, using default');
     } finally {
       const options = {
-        wsUrl: SFU_URL,
+        wsUrl: Auth.authenticateURL(SFU_URL),
         iceServers,
         logger: modLogger,
       };
@@ -85,10 +82,10 @@ export default class KurentoScreenshareBridge {
     try {
       iceServers = await fetchWebRTCMappedStunTurnServers(getSessionToken());
     } catch (error) {
-      logger.error('Screenshare bridge failed to fetch STUN/TURN info, using default');
+      logger.error({ logCode: 'kurentosharescreen_fetchstunturninfo_error' }, 'Screenshare bridge failed to fetch STUN/TURN info, using default');
     } finally {
       const options = {
-        wsUrl: SFU_URL,
+        wsUrl: Auth.authenticateURL(SFU_URL),
         chromeExtension: CHROME_EXTENSION_KEY,
         chromeScreenshareSources: CHROME_SCREENSHARE_SOURCES,
         firefoxScreenshareSource: FIREFOX_SCREENSHARE_SOURCE,

@@ -298,7 +298,7 @@ export default class ShapeDrawListener extends Component {
 
   render() {
     const { tool } = this.props.drawSettings;
-    const baseName = Meteor.settings.public.app.basename;
+    const baseName = Meteor.settings.public.app.cdn + Meteor.settings.public.app.basename;
     const shapeDrawStyle = {
       width: '100%',
       height: '100%',
@@ -348,6 +348,6 @@ ShapeDrawListener.propTypes = {
     // Annotation thickness (not normalized)
     thickness: PropTypes.number.isRequired,
     // The name of the tool currently selected
-    tool: PropTypes.string.isRequired,
+    tool: PropTypes.string,
   }).isRequired,
 };

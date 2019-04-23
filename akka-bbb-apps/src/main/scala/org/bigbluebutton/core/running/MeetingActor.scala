@@ -30,6 +30,8 @@ import org.bigbluebutton.common2.msgs._
 import org.bigbluebutton.core.apps.breakout._
 import org.bigbluebutton.core.apps.polls._
 import org.bigbluebutton.core.apps.voice._
+import akka.actor._
+import akka.actor.SupervisorStrategy.Resume
 
 import scala.concurrent.duration._
 import org.bigbluebutton.core.apps.layout.LayoutApp2x
@@ -39,46 +41,48 @@ import org.bigbluebutton.core2.message.senders.{ MsgBuilder, Sender }
 
 object MeetingActor {
   def props(
-    props:       DefaultProps,
-    eventBus:    InternalEventBus,
-    outGW:       OutMsgRouter,
-    liveMeeting: LiveMeeting): Props =
+      props:       DefaultProps,
+      eventBus:    InternalEventBus,
+      outGW:       OutMsgRouter,
+      liveMeeting: LiveMeeting
+  ): Props =
     Props(classOf[MeetingActor], props, eventBus, outGW, liveMeeting)
 }
 
 class MeetingActor(
-  val props:       DefaultProps,
-  val eventBus:    InternalEventBus,
-  val outGW:       OutMsgRouter,
-  val liveMeeting: LiveMeeting)
-    extends BaseMeetingActor
-    with SystemConfiguration
-    with GuestsApp
-    with LayoutApp2x
-    with VoiceApp2x
-    with BreakoutApp2x
-    with UsersApp2x
+    val props:       DefaultProps,
+    val eventBus:    InternalEventBus,
+    val outGW:       OutMsgRouter,
+    val liveMeeting: LiveMeeting
+)
+  extends BaseMeetingActor
+  with SystemConfiguration
+  with GuestsApp
+  with LayoutApp2x
+  with VoiceApp2x
+  with BreakoutApp2x
+  with UsersApp2x
 
-    with UserBroadcastCamStartMsgHdlr
-    with UserJoinMeetingReqMsgHdlr
-    with UserJoinMeetingAfterReconnectReqMsgHdlr
-    with UserBroadcastCamStopMsgHdlr
-    with UserConnectedToGlobalAudioMsgHdlr
-    with UserDisconnectedFromGlobalAudioMsgHdlr
-    with MuteAllExceptPresentersCmdMsgHdlr
-    with MuteMeetingCmdMsgHdlr
-    with IsMeetingMutedReqMsgHdlr
+  with UserBroadcastCamStartMsgHdlr
+  with UserJoinMeetingReqMsgHdlr
+  with UserJoinMeetingAfterReconnectReqMsgHdlr
+  with UserBroadcastCamStopMsgHdlr
+  with UserConnectedToGlobalAudioMsgHdlr
+  with UserDisconnectedFromGlobalAudioMsgHdlr
+  with MuteAllExceptPresentersCmdMsgHdlr
+  with MuteMeetingCmdMsgHdlr
+  with IsMeetingMutedReqMsgHdlr
 
-    with EjectUserFromVoiceCmdMsgHdlr
-    with EndMeetingSysCmdMsgHdlr
-    with DestroyMeetingSysCmdMsgHdlr
-    with SendTimeRemainingUpdateHdlr
-    with SendBreakoutTimeRemainingMsgHdlr
-    with ChangeLockSettingsInMeetingCmdMsgHdlr
-    with SyncGetMeetingInfoRespMsgHdlr
-    with ClientToServerLatencyTracerMsgHdlr
-    with ValidateConnAuthTokenSysMsgHdlr
-    with UserActivitySignCmdMsgHdlr {
+  with EjectUserFromVoiceCmdMsgHdlr
+  with EndMeetingSysCmdMsgHdlr
+  with DestroyMeetingSysCmdMsgHdlr
+  with SendTimeRemainingUpdateHdlr
+  with SendBreakoutTimeRemainingMsgHdlr
+  with ChangeLockSettingsInMeetingCmdMsgHdlr
+  with SyncGetMeetingInfoRespMsgHdlr
+  with ClientToServerLatencyTracerMsgHdlr
+  with ValidateConnAuthTokenSysMsgHdlr
+  with UserActivitySignCmdMsgHdlr {
 
   override val supervisorStrategy = OneForOneStrategy(maxNrOfRetries = 10, withinTimeRange = 1 minute) {
     case e: Exception => {
@@ -96,7 +100,8 @@ class MeetingActor(
    */
   var actorMonitor = context.actorOf(
     MeetingActorAudit.props(props, eventBus, outGW),
-    "actorMonitor-" + props.meetingProp.intId)
+    "actorMonitor-" + props.meetingProp.intId
+  )
 
   val msgBus = MessageBus(eventBus, outGW)
 
@@ -118,7 +123,8 @@ class MeetingActor(
     TimeUtil.minutesToMillis(props.durationProps.warnMinutesBeforeMax),
     lastActivityTimestampInMs = TimeUtil.timeNowInMs(),
     warningSent = false,
-    warningSentOnTimestampInMs = 0L)
+    warningSentOnTimestampInMs = 0L
+  )
 
   val expiryTracker = new MeetingExpiryTracker(
     startedOnInMs = TimeUtil.timeNowInMs(),
@@ -129,8 +135,9 @@ class MeetingActor(
     meetingExpireIfNoUserJoinedInMs = TimeUtil.minutesToMillis(props.durationProps.meetingExpireIfNoUserJoinedInMinutes),
     meetingExpireWhenLastUserLeftInMs = TimeUtil.minutesToMillis(props.durationProps.meetingExpireWhenLastUserLeftInMinutes),
     userInactivityInspectTimerInMs = TimeUtil.minutesToMillis(props.durationProps.userInactivityInspectTimerInMinutes),
-    userInactivityThresholdInMs = TimeUtil.minutesToMillis(props.durationProps.userInactivityInspectTimerInMinutes),
-    userActivitySignResponseDelayInMs = TimeUtil.minutesToMillis(props.durationProps.userActivitySignResponseDelayInMinutes))
+    userInactivityThresholdInMs = TimeUtil.minutesToMillis(props.durationProps.userInactivityThresholdInMinutes),
+    userActivitySignResponseDelayInMs = TimeUtil.minutesToMillis(props.durationProps.userActivitySignResponseDelayInMinutes)
+  )
 
   val recordingTracker = new MeetingRecordingTracker(startedOnInMs = 0L, previousDurationInMs = 0L, currentDurationInMs = 0L)
 
@@ -140,7 +147,8 @@ class MeetingActor(
     None,
     inactivityTracker,
     expiryTracker,
-    recordingTracker)
+    recordingTracker
+  )
 
   var lastRttTestSentOn = System.currentTimeMillis()
 
@@ -177,6 +185,7 @@ class MeetingActor(
 
   def receive = {
     //=============================
+
     // 2x messages
     case msg: BbbCommonEnvCoreMsg             => handleBbbCommonEnvCoreMsg(msg)
 
@@ -238,6 +247,19 @@ class MeetingActor(
   }
 
   private def handleBbbCommonEnvCoreMsg(msg: BbbCommonEnvCoreMsg): Unit = {
+    msg.core match {
+      case m: ClientToServerLatencyTracerMsg => handleMessageThatDoesNotAffectsInactivity(msg)
+      case _                                 => handleMessageThatAffectsInactivity(msg)
+    }
+  }
+
+  private def handleMessageThatDoesNotAffectsInactivity(msg: BbbCommonEnvCoreMsg): Unit = {
+    msg.core match {
+      case m: ClientToServerLatencyTracerMsg => handleClientToServerLatencyTracerMsg(m)
+    }
+  }
+
+  private def handleMessageThatAffectsInactivity(msg: BbbCommonEnvCoreMsg): Unit = {
 
     msg.core match {
       case m: EndMeetingSysCmdMsg                 => handleEndMeeting(m, state)
@@ -284,8 +306,6 @@ class MeetingActor(
       case m: ModifyWhiteboardAccessPubMsg   => wbApp.handle(m, liveMeeting, msgBus)
       case m: SendWhiteboardAnnotationPubMsg => wbApp.handle(m, liveMeeting, msgBus)
       case m: GetWhiteboardAnnotationsReqMsg => wbApp.handle(m, liveMeeting, msgBus)
-
-      case m: ClientToServerLatencyTracerMsg => handleClientToServerLatencyTracerMsg(m)
 
       // Poll
       case m: StartPollReqMsg =>
@@ -439,7 +459,9 @@ class MeetingActor(
     // sync all voice users
     handleSyncGetVoiceUsersMsg(state, liveMeeting, msgBus)
 
-    // TODO send all lock settings
+    // sync all lock settings
+    handleSyncGetLockSettingsMsg(state, liveMeeting, msgBus)
+
     // TODO send all screen sharing info
 
   }
@@ -455,7 +477,8 @@ class MeetingActor(
     screenshareApp2x.handleScreenshareStoppedVoiceConfEvtMsg(
       liveMeeting.props.voiceProp.voiceConf,
       liveMeeting.props.screenshareProps.screenshareConf,
-      liveMeeting, msgBus)
+      liveMeeting, msgBus
+    )
 
     newState
 
@@ -477,6 +500,8 @@ class MeetingActor(
   }
 
   def handleMonitorNumberOfUsers(msg: MonitorNumberOfUsersInternalMsg) {
+    state = removeUsersWithExpiredUserLeftFlag(liveMeeting, state)
+
     val (newState, expireReason) = ExpiryTrackerHelper.processMeetingInactivityAudit(outGW, eventBus, liveMeeting, state)
     state = newState
     expireReason foreach (reason => log.info("Meeting {} expired with reason {}", props.meetingProp.intId, reason))
@@ -488,7 +513,7 @@ class MeetingActor(
     setRecordingChapterBreak()
 
     processUserInactivityAudit()
-
+    flagRegisteredUsersWhoHasNotJoined()
     checkIfNeetToEndMeetingWhenNoAuthedUsers(liveMeeting)
   }
 
@@ -499,7 +524,9 @@ class MeetingActor(
     val elapsedInMs = now - lastRecBreakSentOn
     val elapsedInMin = TimeUtil.millisToMinutes(elapsedInMs)
 
-    if (elapsedInMin > recordingChapterBreakLenghtInMinutes) {
+    if (props.recordProp.record &&
+            recordingChapterBreakLengthInMinutes > 0 &&
+      elapsedInMin > recordingChapterBreakLengthInMinutes) {
       lastRecBreakSentOn = now
       val event = MsgBuilder.buildRecordingChapterBreakSysMsg(props.meetingProp.intId, TimeUtil.timeNowInMs())
       outGW.send(event)
@@ -546,7 +573,8 @@ class MeetingActor(
         if (authedUsers.isEmpty) {
           sendEndMeetingDueToExpiry(
             MeetingEndReason.ENDED_DUE_TO_NO_AUTHED_USER,
-            eventBus, outGW, liveMeeting)
+            eventBus, outGW, liveMeeting
+          )
         }
       }
     }
@@ -556,50 +584,46 @@ class MeetingActor(
 
   }
 
-  def startRecordingIfAutoStart() {
-    if (props.recordProp.record && !MeetingStatus2x.isRecording(liveMeeting.status) &&
-      props.recordProp.autoStartRecording && Users2x.numUsers(liveMeeting.users2x) == 1) {
+  def removeUsersWithExpiredUserLeftFlag(liveMeeting: LiveMeeting, state: MeetingState2x): MeetingState2x = {
+    val leftUsers = Users2x.findAllExpiredUserLeftFlags(liveMeeting.users2x, expiryTracker.meetingExpireWhenLastUserLeftInMs)
+    leftUsers foreach { leftUser =>
+      for {
+        u <- Users2x.remove(liveMeeting.users2x, leftUser.intId)
+      } yield {
+        log.info("Removing user from meeting. meetingId=" + props.meetingProp.intId + " userId=" + u.intId + " user=" + u)
 
-      MeetingStatus2x.recordingStarted(liveMeeting.status)
+        captionApp2x.handleUserLeavingMsg(leftUser.intId, liveMeeting, msgBus)
 
-      def buildRecordingStatusChangedEvtMsg(meetingId: String, userId: String, recording: Boolean): BbbCommonEnvCoreMsg = {
-        val routing = Routing.addMsgToClientRouting(MessageTypes.BROADCAST_TO_MEETING, meetingId, userId)
-        val envelope = BbbCoreEnvelope(RecordingStatusChangedEvtMsg.NAME, routing)
-        val body = RecordingStatusChangedEvtMsgBody(recording, userId)
-        val header = BbbClientMsgHeader(RecordingStatusChangedEvtMsg.NAME, meetingId, userId)
-        val event = RecordingStatusChangedEvtMsg(header, body)
+        // send a user left event for the clients to update
+        val userLeftMeetingEvent = MsgBuilder.buildUserLeftMeetingEvtMsg(liveMeeting.props.meetingProp.intId, u.intId)
+        outGW.send(userLeftMeetingEvent)
 
-        BbbCommonEnvCoreMsg(envelope, event)
+        if (u.presenter) {
+          UsersApp.automaticallyAssignPresenter(outGW, liveMeeting)
+
+          // request screenshare to end
+          screenshareApp2x.handleScreenshareStoppedVoiceConfEvtMsg(liveMeeting.props.voiceProp.voiceConf, liveMeeting.props.screenshareProps.screenshareConf, liveMeeting, msgBus)
+
+          // request ongoing poll to end
+          Polls.handleStopPollReqMsg(state, u.intId, liveMeeting)
+        }
       }
-
-      val event = buildRecordingStatusChangedEvtMsg(
-        liveMeeting.props.meetingProp.intId,
-        "system", MeetingStatus2x.isRecording(liveMeeting.status))
-      outGW.send(event)
-
     }
-  }
 
-  def stopAutoStartedRecording() {
-    if (props.recordProp.record && MeetingStatus2x.isRecording(liveMeeting.status) &&
-      props.recordProp.autoStartRecording && Users2x.numUsers(liveMeeting.users2x) == 0) {
-      log.info("Last web user left. Auto stopping recording. meetingId={}", props.meetingProp.intId)
-      MeetingStatus2x.recordingStopped(liveMeeting.status)
+    stopRecordingIfAutoStart2x(outGW, liveMeeting, state)
 
-      def buildRecordingStatusChangedEvtMsg(meetingId: String, userId: String, recording: Boolean): BbbCommonEnvCoreMsg = {
-        val routing = Routing.addMsgToClientRouting(MessageTypes.BROADCAST_TO_MEETING, meetingId, userId)
-        val envelope = BbbCoreEnvelope(RecordingStatusChangedEvtMsg.NAME, routing)
-        val body = RecordingStatusChangedEvtMsgBody(recording, userId)
-        val header = BbbClientMsgHeader(RecordingStatusChangedEvtMsg.NAME, meetingId, userId)
-        val event = RecordingStatusChangedEvtMsg(header, body)
+    if (liveMeeting.props.meetingProp.isBreakout) {
+      updateParentMeetingWithUsers()
+    }
 
-        BbbCommonEnvCoreMsg(envelope, event)
-      }
-
-      val event = buildRecordingStatusChangedEvtMsg(
-        liveMeeting.props.meetingProp.intId,
-        "system", MeetingStatus2x.isRecording(liveMeeting.status))
-      outGW.send(event)
+    if (state.expiryTracker.userHasJoined &&
+      Users2x.numUsers(liveMeeting.users2x) == 0
+      && !state.expiryTracker.lastUserLeftOnInMs.isDefined) {
+      log.info("Setting meeting no more users. meetingId=" + props.meetingProp.intId)
+      val tracker = state.expiryTracker.setLastUserLeftOn(TimeUtil.timeNowInMs())
+      state.update(tracker)
+    } else {
+      state
     }
   }
 
@@ -608,8 +632,11 @@ class MeetingActor(
 
   def processUserInactivityAudit(): Unit = {
     val now = TimeUtil.timeNowInMs()
-    // Time to do a new check?
-    if (now > lastUserInactivityInspectSentOn + expiryTracker.userInactivityInspectTimerInMs) {
+
+    // Check if user is inactive. We only do the check is user inactivity
+    // is not disabled (0).
+    if ((expiryTracker.userInactivityInspectTimerInMs > 0) &&
+      (now > lastUserInactivityInspectSentOn + expiryTracker.userInactivityInspectTimerInMs)) {
       lastUserInactivityInspectSentOn = now
       checkInactiveUsers = true
       warnPotentiallyInactiveUsers()
@@ -636,12 +663,27 @@ class MeetingActor(
     log.info("Check for users who haven't responded to user inactivity warning.")
     val users = Users2x.findAll(liveMeeting.users2x)
     users foreach { u =>
-      val respondedOntIme = (lastUserInactivityInspectSentOn - expiryTracker.userInactivityThresholdInMs) < u.lastActivityTime && (lastUserInactivityInspectSentOn + expiryTracker.userActivitySignResponseDelayInMs) > u.lastActivityTime
-      if (!respondedOntIme) {
+      val respondedOnTime = (lastUserInactivityInspectSentOn - expiryTracker.userInactivityThresholdInMs) < u.lastActivityTime && (lastUserInactivityInspectSentOn + expiryTracker.userActivitySignResponseDelayInMs) > u.lastActivityTime
+      if (!respondedOnTime) {
         UsersApp.ejectUserFromMeeting(outGW, liveMeeting, u.intId, SystemUser.ID, "User inactive for too long.", EjectReasonCode.USER_INACTIVITY)
         Sender.sendDisconnectClientSysMsg(liveMeeting.props.meetingProp.intId, u.intId, SystemUser.ID, EjectReasonCode.USER_INACTIVITY, outGW)
       }
     }
   }
 
+  def flagRegisteredUsersWhoHasNotJoined(): Unit = {
+    val users = RegisteredUsers.findUsersNotJoined(liveMeeting.registeredUsers)
+    users foreach { u =>
+      val now = System.currentTimeMillis()
+      if (now - u.registeredOn > TimeUtil.secondsToMillis(maxRegUserToJoinTime)) {
+        RegisteredUsers.markAsUserFailedToJoin(liveMeeting.registeredUsers, u)
+        val event = MsgBuilder.buildRegisteredUserJoinTimeoutMsg(
+          liveMeeting.props.meetingProp.intId,
+          u.id,
+          u.name
+        )
+        outGW.send(event)
+      }
+    }
+  }
 }

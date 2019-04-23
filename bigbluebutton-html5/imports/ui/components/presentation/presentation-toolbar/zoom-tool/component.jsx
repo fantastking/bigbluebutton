@@ -1,57 +1,91 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
-import { FormattedMessage } from 'react-intl';
+import { FormattedMessage, defineMessages, injectIntl } from 'react-intl';
 import Button from '/imports/ui/components/button/component';
+import cx from 'classnames';
 import { styles } from '../styles.scss';
+import HoldButton from './holdButton/component';
 
 const DELAY_MILLISECONDS = 200;
 const STEP_TIME = 100;
 
-export default class ZoomTool extends Component {
+const intlMessages = defineMessages({
+  resetZoomLabel: {
+    id: 'app.presentation.presentationToolbar.zoomReset',
+    description: 'Reset zoom button label',
+  },
+  zoomInLabel: {
+    id: 'app.presentation.presentationToolbar.zoomInLabel',
+    description: 'Aria label for increment zoom level',
+  },
+  zoomInDesc: {
+    id: 'app.presentation.presentationToolbar.zoomInDesc',
+    description: 'Aria description for increment zoom level',
+  },
+  zoomOutLabel: {
+    id: 'app.presentation.presentationToolbar.zoomOutLabel',
+    description: 'Aria label for decrement zoom level',
+  },
+  zoomOutDesc: {
+    id: 'app.presentation.presentationToolbar.zoomOutDesc',
+    description: 'Aria description for decrement zoom level',
+  },
+  zoomIndicator: {
+    id: 'app.presentation.presentationToolbar.zoomIndicator',
+    description: 'Aria label for current zoom level',
+  },
+});
+
+class ZoomTool extends Component {
   static renderAriaLabelsDescs() {
     return (
       <div hidden key="hidden-div">
-        {/* Zoom in button aria */}
         <div id="zoomInLabel">
           <FormattedMessage
             id="app.presentation.presentationToolbar.zoomInLabel"
-            description="Aria label for when switching to previous slide"
-            defaultMessage="Previous slide"
+            description="Aria label for increment zoom level"
+            defaultMessage="Increment zoom"
           />
         </div>
         <div id="zoomInDesc">
           <FormattedMessage
             id="app.presentation.presentationToolbar.zoomInDesc"
-            description="Aria description for when switching to previous slide"
-            defaultMessage="Change the presentation to the previous slide"
+            description="Aria description for increment zoom level"
+            defaultMessage="Increment zoom"
           />
         </div>
-        {/* Zoom out button aria */}
         <div id="zoomOutLabel">
           <FormattedMessage
             id="app.presentation.presentationToolbar.zoomOutLabel"
-            description="Aria label for when switching to next slide"
-            defaultMessage="Next slide"
+            description="Aria label for decrement zoom level"
+            defaultMessage="Decrement zoom"
           />
         </div>
         <div id="zoomOutDesc">
           <FormattedMessage
             id="app.presentation.presentationToolbar.zoomOutDesc"
-            description="Aria description for when switching to next slide"
-            defaultMessage="Change the presentation to the next slide"
+            description="Aria description for decrement zoom level"
+            defaultMessage="Decrement zoom"
           />
         </div>
-        {/* Zoom indicator aria */}
         <div id="zoomIndicator">
           <FormattedMessage
             id="app.presentation.presentationToolbar.zoomIndicator"
-            description="Aria label for when switching to a specific slide"
-            defaultMessage="Skip slide"
+            description="Aria label for current zoom level"
+            defaultMessage="Current zoom level"
+          />
+        </div>
+        <div id="zoomReset">
+          <FormattedMessage
+            id="app.presentation.presentationToolbar.zoomReset"
+            description="Aria label for reset zoom level"
+            defaultMessage="Reset zoom level"
           />
         </div>
       </div>
     );
   }
+
   constructor(props) {
     super(props);
     this.increment = this.increment.bind(this);
@@ -62,13 +96,17 @@ export default class ZoomTool extends Component {
     this.onChanger = this.onChanger.bind(this);
     this.setInt = 0;
     this.state = {
-      value: props.value,
+      stateZoomValue: props.zoomValue,
+      initialstateZoomValue: props.zoomValue,
       mouseHolding: false,
     };
   }
+
   componentDidUpdate() {
-    const isDifferent = this.props.value !== this.state.value;
-    if (isDifferent) this.onChanger(this.props.value);
+    const { zoomValue } = this.props;
+    const { stateZoomValue } = this.state;
+    const isDifferent = zoomValue !== stateZoomValue;
+    if (isDifferent) this.onChanger(zoomValue);
   }
 
   onChanger(value) {
@@ -76,9 +114,11 @@ export default class ZoomTool extends Component {
       maxBound,
       minBound,
       change,
+      zoomValue,
     } = this.props;
+    const { stateZoomValue } = this.state;
     let newValue = value;
-    const isDifferent = newValue !== this.state.value;
+    const isDifferent = newValue !== stateZoomValue;
 
     if (newValue <= minBound) {
       newValue = minBound;
@@ -86,31 +126,35 @@ export default class ZoomTool extends Component {
       newValue = maxBound;
     }
 
-    const propsIsDifferente = this.props.value !== newValue;
+    const propsIsDifferente = zoomValue !== newValue;
     if (isDifferent && propsIsDifferente) {
-      this.setState({ value: newValue }, () => {
+      this.setState({ stateZoomValue: newValue }, () => {
         change(newValue);
       });
     }
-    if (isDifferent && !propsIsDifferente) this.setState({ value: newValue });
+    if (isDifferent && !propsIsDifferente) this.setState({ stateZoomValue: newValue });
   }
 
   increment() {
     const {
       step,
     } = this.props;
-    const increaseZoom = this.state.value + step;
+    const { stateZoomValue } = this.state;
+    const increaseZoom = stateZoomValue + step;
     this.onChanger(increaseZoom);
   }
+
   decrement() {
     const {
       step,
     } = this.props;
-    const decreaseZoom = this.state.value - step;
+    const { stateZoomValue } = this.state;
+    const decreaseZoom = stateZoomValue - step;
     this.onChanger(decreaseZoom);
   }
 
   execInterval(inc) {
+    const { mouseHolding } = this.state;
     const exec = inc ? this.increment : this.decrement;
 
     const interval = () => {
@@ -119,7 +163,7 @@ export default class ZoomTool extends Component {
     };
 
     setTimeout(() => {
-      if (this.state.mouseHolding) {
+      if (mouseHolding) {
         interval();
       }
     }, DELAY_MILLISECONDS);
@@ -127,7 +171,6 @@ export default class ZoomTool extends Component {
 
   mouseDownHandler(bool) {
     this.setState({
-      ...this.state,
       mouseHolding: true,
     }, () => {
       this.execInterval(bool);
@@ -136,67 +179,92 @@ export default class ZoomTool extends Component {
 
   mouseUpHandler() {
     this.setState({
-      ...this.state,
       mouseHolding: false,
     }, () => clearInterval(this.setInt));
   }
 
+  resetZoom() {
+    const { stateZoomValue, initialstateZoomValue } = this.state;
+    if (stateZoomValue !== initialstateZoomValue) this.onChanger(initialstateZoomValue);
+  }
+
   render() {
     const {
-      value,
+      zoomValue,
       minBound,
       maxBound,
+      intl,
+      tooltipDistance,
     } = this.props;
+    const { stateZoomValue } = this.state;
     return (
       [
-        ZoomTool.renderAriaLabelsDescs(),
-        (<Button
-          key="zoom-tool-1"
-          aria-labelledby="zoomInLabel"
-          aria-describedby="zoomInDesc"
-          role="button"
-          label="-"
-          icon="minus"
-          onClick={() => this.decrement()}
-          disabled={(value <= minBound)}
-          onMouseDown={() => this.mouseDownHandler(false)}
-          onMouseUp={this.mouseUpHandler}
-          onMouseLeave={this.mouseUpHandler}
-          className={styles.prevSlide}
-          hideLabel
-        />),
         (
-          <span
-            key="zoom-tool-2"
-            aria-labelledby="prevSlideLabel"
-            aria-describedby={this.state.value}
-            className={styles.zoomPercentageDisplay}
+          <HoldButton
+            key="zoom-tool-1"
+            exec={this.decrement}
+            value={zoomValue}
+            minBound={minBound}
           >
-            {`${this.state.value}%`}
-          </span>
+            <Button
+              key="zoom-tool-1"
+              aria-labelledby="zoomOutLabel"
+              aria-describedby="zoomOutDesc"
+              aria-label={intl.formatMessage(intlMessages.zoomOutLabel)}
+              label={intl.formatMessage(intlMessages.zoomOutLabel)}
+              icon="substract"
+              onClick={() => { }}
+              disabled={(zoomValue <= minBound)}
+              className={cx(styles.prevSlide, styles.presentationBtn)}
+              tooltipDistance={tooltipDistance}
+              hideLabel
+            />
+          </HoldButton>
         ),
-        (<Button
-          key="zoom-tool-3"
-          aria-labelledby="zoomOutLabel"
-          aria-describedby="zoomOutDesc"
-          role="button"
-          label="+"
-          icon="plus"
-          onClick={() => this.increment()}
-          disabled={(value >= maxBound)}
-          onMouseDown={() => this.mouseDownHandler(true)}
-          onMouseUp={this.mouseUpHandler}
-          onMouseLeave={this.mouseUpHandler}
-          className={styles.skipSlide}
-          hideLabel
-        />),
+        (
+          <Button
+            key="zoom-tool-2"
+            aria-labelledby="zoomReset"
+            aria-describedby={stateZoomValue}
+            color="default"
+            customIcon={`${stateZoomValue}%`}
+            size="md"
+            onClick={() => this.resetZoom()}
+            label={intl.formatMessage(intlMessages.resetZoomLabel)}
+            className={cx(styles.zoomPercentageDisplay, styles.presentationBtn)}
+            tooltipDistance={tooltipDistance}
+            hideLabel
+          />
+        ),
+        (
+          <HoldButton
+            key="zoom-tool-3"
+            exec={this.increment}
+            value={zoomValue}
+            maxBound={maxBound}
+          >
+            <Button
+              key="zoom-tool-3"
+              aria-labelledby="zoomInLabel"
+              aria-describedby="zoomInDesc"
+              aria-label={intl.formatMessage(intlMessages.zoomInLabel)}
+              label={intl.formatMessage(intlMessages.zoomInLabel)}
+              icon="add"
+              onClick={() => { }}
+              disabled={(zoomValue >= maxBound)}
+              className={cx(styles.skipSlide, styles.presentationBtn)}
+              tooltipDistance={tooltipDistance}
+              hideLabel
+            />
+          </HoldButton>
+        ),
       ]
     );
   }
 }
 
 const propTypes = {
-  value: PropTypes.number.isRequired,
+  zoomValue: PropTypes.number.isRequired,
   change: PropTypes.func.isRequired,
   minBound: PropTypes.number.isRequired,
   maxBound: PropTypes.number.isRequired,
@@ -204,3 +272,5 @@ const propTypes = {
 };
 
 ZoomTool.propTypes = propTypes;
+
+export default injectIntl(ZoomTool);

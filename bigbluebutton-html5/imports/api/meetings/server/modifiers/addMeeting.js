@@ -1,15 +1,13 @@
 import flat from 'flat';
-import { check } from 'meteor/check';
+import {
+  check,
+  Match,
+} from 'meteor/check';
 import Meetings from '/imports/api/meetings';
 import Logger from '/imports/startup/server/logger';
 
-import addGroupChatMsg from '/imports/api/group-chat-msg/server/modifiers/addGroupChatMsg';
-
 export default function addMeeting(meeting) {
   const meetingId = meeting.meetingProp.intId;
-  const CHAT_CONFIG = Meteor.settings.public.chat;
-  const PUBLIC_CHAT_SYSTEM_ID = CHAT_CONFIG.system_userid;
-  const PUBLIC_GROUP_CHAT_ID = CHAT_CONFIG.public_group_id;
 
   check(meetingId, String);
   check(meeting, {
@@ -41,17 +39,18 @@ export default function addMeeting(meeting) {
       userInactivityInspectTimerInMinutes: Number,
       userInactivityThresholdInMinutes: Number,
       userActivitySignResponseDelayInMinutes: Number,
+      timeRemaining: Number,
     },
     welcomeProp: {
       welcomeMsg: String,
       modOnlyMessage: String,
       welcomeMsgTemplate: String,
     },
-    recordProp: {
+    recordProp: Match.ObjectIncluding({
       allowStartStopRecording: Boolean,
       autoStartRecording: Boolean,
       record: Boolean,
-    },
+    }),
     password: {
       viewerPass: String,
       moderatorPass: String,
@@ -70,29 +69,50 @@ export default function addMeeting(meeting) {
     metadataProp: Object,
   });
 
+  const newMeeting = meeting;
+
   const selector = {
     meetingId,
   };
 
+  const lockSettingsProp = {
+    disableCam: false,
+    disableMic: false,
+    disablePrivChat: false,
+    disablePubChat: false,
+    lockOnJoin: true,
+    lockOnJoinConfigurable: false,
+    lockedLayout: false,
+    setBy: 'temp',
+  };
+
+  const meetingEnded = false;
+
+  newMeeting.welcomeProp.welcomeMsg = newMeeting.welcomeProp.welcomeMsg.replace(
+    'href="event:',
+    'href="',
+  );
+
+  const insertBlankTarget = (s, i) => `${s.substr(0, i)} target="_blank"${s.substr(i)}`;
+  const linkWithoutTarget = new RegExp('<a href="(.*?)">', 'g');
+  linkWithoutTarget.test(newMeeting.welcomeProp.welcomeMsg);
+
+  if (linkWithoutTarget.lastIndex > 0) {
+    newMeeting.welcomeProp.welcomeMsg = insertBlankTarget(
+      newMeeting.welcomeProp.welcomeMsg,
+      linkWithoutTarget.lastIndex - 1,
+    );
+  }
+
   const modifier = {
-    $set: Object.assign(
-      { meetingId },
-      flat(meeting, { safe: true }),
-    ),
+    $set: Object.assign({
+      meetingId,
+      meetingEnded,
+      lockSettingsProp,
+    }, flat(newMeeting, {
+      safe: true,
+    })),
   };
-
-  const welcomeMsg = {
-    color: '0',
-    timestamp: Date.now(),
-    correlationId: `${PUBLIC_CHAT_SYSTEM_ID}-${Date.now()}`,
-    sender: {
-      id: PUBLIC_CHAT_SYSTEM_ID,
-      name: '',
-    },
-    message: meeting.welcomeProp.welcomeMsg,
-  };
-
-  addGroupChatMsg(meetingId, PUBLIC_GROUP_CHAT_ID, welcomeMsg);
 
   const cb = (err, numChanged) => {
     if (err) {
@@ -100,7 +120,10 @@ export default function addMeeting(meeting) {
       return;
     }
 
-    const { insertedId } = numChanged;
+    const {
+      insertedId,
+    } = numChanged;
+
     if (insertedId) {
       Logger.info(`Added meeting id=${meetingId}`);
     }

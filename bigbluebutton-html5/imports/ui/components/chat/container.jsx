@@ -1,6 +1,8 @@
-import React, { Component } from 'react';
+import React, { PureComponent } from 'react';
 import { defineMessages, injectIntl } from 'react-intl';
 import { withTracker } from 'meteor/react-meteor-data';
+import { Session } from 'meteor/session';
+import Auth from '/imports/ui/services/auth';
 import Chat from './component';
 import ChatService from './service';
 
@@ -27,11 +29,12 @@ const intlMessages = defineMessages({
   },
 });
 
-class ChatContainer extends Component {
+class ChatContainer extends PureComponent {
   componentDidMount() {
     // in case of reopening a chat, need to make sure it's removed from closed list
-    ChatService.removeFromClosedChatsSession(this.props.chatID);
+    ChatService.removeFromClosedChatsSession();
   }
+
   render() {
     return (
       <Chat {...this.props}>
@@ -41,9 +44,8 @@ class ChatContainer extends Component {
   }
 }
 
-export default injectIntl(withTracker(({ params, intl }) => {
-  const chatID = params.chatID || PUBLIC_CHAT_KEY;
-
+export default injectIntl(withTracker(({ intl }) => {
+  const chatID = Session.get('idChatOpen') || PUBLIC_CHAT_KEY;
   let messages = [];
   let isChatLocked = ChatService.isChatLocked(chatID);
   let title = intl.formatMessage(intlMessages.titlePublic);
@@ -52,9 +54,52 @@ export default injectIntl(withTracker(({ params, intl }) => {
   let systemMessageIntl = {};
 
   if (chatID === PUBLIC_CHAT_KEY) {
-    messages = ChatService.reduceAndMapGroupMessages(ChatService.getPublicGroupMessages());
+    const { welcomeProp } = ChatService.getMeeting();
+    const user = ChatService.getUser(Auth.userID);
+
+    messages = ChatService.getPublicGroupMessages();
+
+    const time = user.loginTime;
+    const welcomeId = `welcome-msg-${time}`;
+
+    const welcomeMsg = {
+      id: welcomeId,
+      content: [{
+        id: welcomeId,
+        text: welcomeProp.welcomeMsg,
+        time,
+      }],
+      time,
+      sender: null,
+    };
+
+    const moderatorTime = time + 1;
+    const moderatorId = `moderator-msg-${moderatorTime}`;
+
+    const moderatorMsg = {
+      id: moderatorId,
+      content: [{
+        id: moderatorId,
+        text: welcomeProp.modOnlyMessage,
+        time: moderatorTime,
+      }],
+      time: moderatorTime,
+      sender: null,
+    };
+
+    const messagesBeforeWelcomeMsg = ChatService.reduceAndMapGroupMessages(
+      messages.filter(message => message.timestamp < time));
+    const messagesAfterWelcomeMsg = ChatService.reduceAndMapGroupMessages(
+      messages.filter(message => message.timestamp >= time));
+
+    const messagesFormated = messagesBeforeWelcomeMsg
+      .concat(welcomeMsg)
+      .concat(user.isModerator ? moderatorMsg : [])
+      .concat(messagesAfterWelcomeMsg);
+
+    messages = messagesFormated.sort((a, b) => (a.time - b.time));
   } else {
-    messages = ChatService.getPrivateGroupMessages(chatID);
+    messages = ChatService.getPrivateGroupMessages();
 
     const user = ChatService.getUser(chatID);
     chatName = user.name;
@@ -88,8 +133,8 @@ export default injectIntl(withTracker(({ params, intl }) => {
       ...message,
       content: message.content.map(content => ({
         ...content,
-        text: content.text in intlMessages ?
-          `<b><i>${intl.formatMessage(intlMessages[content.text], systemMessageIntl)}</i></b>` : content.text,
+        text: content.text in intlMessages
+          ? `<b><i>${intl.formatMessage(intlMessages[content.text], systemMessageIntl)}</i></b>` : content.text,
       })),
     };
   });
@@ -111,17 +156,18 @@ export default injectIntl(withTracker(({ params, intl }) => {
     scrollPosition,
     minMessageLength: CHAT_CONFIG.min_message_length,
     maxMessageLength: CHAT_CONFIG.max_message_length,
+    UnsentMessagesCollection: ChatService.UnsentMessagesCollection,
     actions: {
       handleClosePrivateChat: chatId => ChatService.closePrivateChat(chatId),
 
       handleSendMessage: (message) => {
-        ChatService.updateScrollPosition(chatID, null);
-        return ChatService.sendGroupMessage(chatID, message);
+        ChatService.updateScrollPosition(null);
+        return ChatService.sendGroupMessage(message);
       },
 
-      handleScrollUpdate: position => ChatService.updateScrollPosition(chatID, position),
+      handleScrollUpdate: position => ChatService.updateScrollPosition(position),
 
-      handleReadMessage: timestamp => ChatService.updateUnreadMessage(chatID, timestamp),
+      handleReadMessage: timestamp => ChatService.updateUnreadMessage(timestamp),
     },
   };
 })(ChatContainer));

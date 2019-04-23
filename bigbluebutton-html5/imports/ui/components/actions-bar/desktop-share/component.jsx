@@ -5,6 +5,7 @@ import browser from 'browser-detect';
 import Button from '/imports/ui/components/button/component';
 import logger from '/imports/startup/client/logger';
 import { notify } from '/imports/ui/services/notification';
+import cx from 'classnames';
 import { styles } from '../styles';
 
 const propTypes = {
@@ -13,6 +14,7 @@ const propTypes = {
   handleShareScreen: PropTypes.func.isRequired,
   handleUnshareScreen: PropTypes.func.isRequired,
   isVideoBroadcasting: PropTypes.bool.isRequired,
+  screenSharingCheck: PropTypes.bool.isRequired,
 };
 
 const intlMessages = defineMessages({
@@ -39,11 +41,11 @@ const intlMessages = defineMessages({
 });
 
 const BROWSER_RESULTS = browser();
-const isMobileBrowser = (BROWSER_RESULTS ? BROWSER_RESULTS.mobile : false) ||
-  (BROWSER_RESULTS && BROWSER_RESULTS.os ?
-    BROWSER_RESULTS.os.includes('Android') : // mobile flag doesn't always work
-    false);
-const screenSharingCheck = Meteor.settings.public.kurento.enableScreensharing;
+const isMobileBrowser = (BROWSER_RESULTS ? BROWSER_RESULTS.mobile : false)
+  || (BROWSER_RESULTS && BROWSER_RESULTS.os
+    ? BROWSER_RESULTS.os.includes('Android') // mobile flag doesn't always work
+    : false);
+
 const ICE_CONNECTION_FAILED = 'ICE connection failed';
 
 const DesktopShare = ({
@@ -52,34 +54,39 @@ const DesktopShare = ({
   handleUnshareScreen,
   isVideoBroadcasting,
   isUserPresenter,
+  screenSharingCheck,
+  screenShareEndAlert,
 }) => {
   const onFail = (error) => {
     switch (error) {
       case ICE_CONNECTION_FAILED:
         kurentoExitScreenShare();
-        logger.error('Ice connection state error');
+        logger.error({ logCode: 'desktopshare_iceconnectionstate_error' }, 'ICE connection state error');
         notify(intl.formatMessage(intlMessages.iceConnectionStateError), 'error', 'desktop');
         break;
       default:
-        logger.error(error || 'Default error handler');
+        logger.error({ logCode: 'desktopshare_default_error' }, error || 'Default error handler');
     }
+    screenShareEndAlert();
   };
-  return (screenSharingCheck && !isMobileBrowser && isUserPresenter ?
-    <Button
-      className={styles.button}
-      icon={isVideoBroadcasting ? 'desktop_off' : 'desktop'}
-      label={intl.formatMessage(isVideoBroadcasting ?
-          intlMessages.stopDesktopShareLabel : intlMessages.desktopShareLabel)}
-      description={intl.formatMessage(isVideoBroadcasting ?
-          intlMessages.stopDesktopShareDesc : intlMessages.desktopShareDesc)}
-      color={isVideoBroadcasting ? 'danger' : 'primary'}
-      ghost={false}
-      hideLabel
-      circle
-      size="lg"
-      onClick={isVideoBroadcasting ? handleUnshareScreen : () => handleShareScreen(onFail)}
-      id={isVideoBroadcasting ? 'unshare-screen-button' : 'share-screen-button'}
-    />
+  return (screenSharingCheck && !isMobileBrowser && isUserPresenter
+    ? (
+      <Button
+        className={cx(styles.button, isVideoBroadcasting || styles.btn)}
+        icon={isVideoBroadcasting ? 'desktop' : 'desktop_off'}
+        label={intl.formatMessage(isVideoBroadcasting
+          ? intlMessages.stopDesktopShareLabel : intlMessages.desktopShareLabel)}
+        description={intl.formatMessage(isVideoBroadcasting
+          ? intlMessages.stopDesktopShareDesc : intlMessages.desktopShareDesc)}
+        color={isVideoBroadcasting ? 'primary' : 'default'}
+        ghost={!isVideoBroadcasting}
+        hideLabel
+        circle
+        size="lg"
+        onClick={isVideoBroadcasting ? handleUnshareScreen : () => handleShareScreen(onFail)}
+        id={isVideoBroadcasting ? 'unshare-screen-button' : 'share-screen-button'}
+      />
+    )
     : null);
 };
 

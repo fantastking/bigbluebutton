@@ -1,6 +1,5 @@
 import React, { Component } from 'react';
 import { withTracker } from 'meteor/react-meteor-data';
-import { withRouter } from 'react-router';
 import PropTypes from 'prop-types';
 import Auth from '/imports/ui/services/auth';
 import AppContainer from '/imports/ui/components/app/container';
@@ -14,47 +13,143 @@ import Users from '/imports/api/users';
 import Annotations from '/imports/api/annotations';
 import AnnotationsLocal from '/imports/ui/components/whiteboard/service';
 import GroupChat from '/imports/api/group-chat';
+import mapUser from '/imports/ui/services/user/mapUser';
+import { Session } from 'meteor/session';
 import IntlStartup from './intl';
+import Meetings from '../../api/meetings';
+import AppService from '/imports/ui/components/app/service';
+import AnnotationsTextService from '/imports/ui/components/whiteboard/annotations/text/service';
+import Breakouts from '/imports/api/breakouts';
+import AudioService from '/imports/ui/components/audio/service';
+import { FormattedMessage } from 'react-intl';
+import { notify } from '/imports/ui/services/notification';
 
 const CHAT_CONFIG = Meteor.settings.public.chat;
 const PUBLIC_GROUP_CHAT_ID = CHAT_CONFIG.public_group_id;
 const PUBLIC_CHAT_TYPE = CHAT_CONFIG.type_public;
+const HTML = document.getElementsByTagName('html')[0];
+
+let breakoutNotified = false;
 
 const propTypes = {
-  error: PropTypes.object,
-  errorCode: PropTypes.number,
   subscriptionsReady: PropTypes.bool.isRequired,
   locale: PropTypes.string,
-  endedCode: PropTypes.string,
   approved: PropTypes.bool,
+  meetingHasEnded: PropTypes.bool.isRequired,
+  meetingExist: PropTypes.bool,
 };
 
 const defaultProps = {
-  error: undefined,
-  errorCode: undefined,
   locale: undefined,
-  endedCode: undefined,
   approved: undefined,
+  meetingExist: false,
 };
 
+const fullscreenChangedEvents = [
+  'fullscreenchange',
+  'webkitfullscreenchange',
+  'mozfullscreenchange',
+  'MSFullscreenChange',
+];
+
 class Base extends Component {
+  static handleFullscreenChange() {
+    if (document.fullscreenElement
+      || document.webkitFullscreenElement
+      || document.mozFullScreenElement
+      || document.msFullscreenElement) {
+      Session.set('isFullscreen', true);
+    } else {
+      Session.set('isFullscreen', false);
+    }
+  }
+
   constructor(props) {
     super(props);
 
     this.state = {
       loading: false,
-      error: props.error || null,
+      meetingExisted: false,
     };
 
     this.updateLoadingState = this.updateLoadingState.bind(this);
-    this.updateErrorState = this.updateErrorState.bind(this);
   }
 
-  componentWillUpdate() {
-    const { approved } = this.props;
-    const isLoading = this.state.loading;
+  componentDidMount() {
+    const { animations } = this.props;
 
-    if (approved && isLoading) this.updateLoadingState(false);
+    if (animations) HTML.classList.add('animationsEnabled');
+    if (!animations) HTML.classList.add('animationsDisabled');
+
+    fullscreenChangedEvents.forEach((event) => {
+      document.addEventListener(event, Base.handleFullscreenChange);
+    });
+    Session.set('isFullscreen', false);
+  }
+
+  componentDidUpdate(prevProps, prevState) {
+    const {
+      approved,
+      meetingExist,
+      animations,
+      ejected,
+      meteorIsConnected,
+      subscriptionsReady,
+    } = this.props;
+
+    const {
+      loading,
+      meetingExisted,
+    } = this.state;
+
+    if (!prevProps.subscriptionsReady && subscriptionsReady) {
+      logger.info({ logCode: 'startup_client_subscriptions_ready' }, 'Subscriptions are ready');
+    }
+
+    if (prevProps.meetingExist && !meetingExist && !meetingExisted) {
+      this.setMeetingExisted(true);
+    }
+
+    // In case the meteor restart avoid error log
+    if (meteorIsConnected && (prevState.meetingExisted !== meetingExisted) && meetingExisted) {
+      this.setMeetingExisted(false);
+    }
+
+    // In case the meeting delayed to load
+    if (!subscriptionsReady || !meetingExist) return;
+
+    if (approved && loading) this.updateLoadingState(false);
+
+    if (prevProps.ejected || ejected) {
+      Session.set('codeError', '403');
+      Session.set('isMeetingEnded', true);
+    }
+
+    // In case the meteor restart avoid error log
+    if (meteorIsConnected && (prevState.meetingExisted !== meetingExisted)) {
+      this.setMeetingExisted(false);
+    }
+
+    const enabled = HTML.classList.contains('animationsEnabled');
+    const disabled = HTML.classList.contains('animationsDisabled');
+
+    if (animations && animations !== prevProps.animations) {
+      if (disabled) HTML.classList.remove('animationsDisabled');
+      HTML.classList.add('animationsEnabled');
+    } else if (!animations && animations !== prevProps.animations) {
+      if (enabled) HTML.classList.remove('animationsEnabled');
+      HTML.classList.add('animationsDisabled');
+    }
+  }
+
+  componentWillUnmount() {
+    fullscreenChangedEvents.forEach((event) => {
+      document.removeEventListener(event, Base.handleFullscreenChange);
+    });
+  }
+
+  setMeetingExisted(meetingExisted) {
+    this.setState({ meetingExisted });
   }
 
   updateLoadingState(loading = false) {
@@ -63,52 +158,58 @@ class Base extends Component {
     });
   }
 
-  updateErrorState(error = null) {
-    this.setState({
-      error,
-    });
-  }
-
   renderByState() {
-    const { updateLoadingState, updateErrorState } = this;
-    const stateControls = { updateLoadingState, updateErrorState };
+    const { updateLoadingState } = this;
+    const stateControls = { updateLoadingState };
+    const { loading } = this.state;
+    const codeError = Session.get('codeError');
+    const {
+      ejected,
+      subscriptionsReady,
+      meetingExist,
+      meetingHasEnded,
+      meetingIsBreakout,
+    } = this.props;
 
-    const { loading, error } = this.state;
-
-    const { subscriptionsReady, errorCode } = this.props;
-    const { endedCode } = this.props.params;
-
-    if (endedCode) {
-      AudioManager.exitAudio();
-      return (<MeetingEnded code={endedCode} />);
-    }
-
-    if (error || errorCode) {
-      logger.error(`User could not log in HTML5, hit ${errorCode}`);
-      return (<ErrorScreen code={errorCode}>{error}</ErrorScreen>);
-    }
-
-    if (loading || !subscriptionsReady) {
+    if ((loading || !subscriptionsReady) && !meetingHasEnded && meetingExist) {
       return (<LoadingScreen>{loading}</LoadingScreen>);
     }
-    // this.props.annotationsHandler.stop();
 
-    if (subscriptionsReady) {
-      logger.info('Client loaded successfully');
+    if (ejected && ejected.ejectedReason) {
+      const { ejectedReason } = ejected;
+      AudioManager.exitAudio();
+      return (<MeetingEnded code={ejectedReason} />);
     }
 
+    if (meetingHasEnded && meetingIsBreakout) window.close();
+
+    if (meetingHasEnded && !meetingIsBreakout) {
+      AudioManager.exitAudio();
+      return (<MeetingEnded code={codeError} />);
+    }
+
+    if (codeError && !meetingHasEnded) {
+      logger.error({ logCode: 'startup_client_usercouldnotlogin_error' }, `User could not log in HTML5, hit ${codeError}`);
+      return (<ErrorScreen code={codeError} />);
+    }
+    // this.props.annotationsHandler.stop();
     return (<AppContainer {...this.props} baseControls={stateControls} />);
   }
 
   render() {
-    const { updateLoadingState, updateErrorState } = this;
-    const { locale } = this.props;
-    const stateControls = { updateLoadingState, updateErrorState };
+    const { updateLoadingState } = this;
+    const { locale, meetingExist } = this.props;
+    const stateControls = { updateLoadingState };
+    const { meetingExisted } = this.state;
 
     return (
-      <IntlStartup locale={locale} baseControls={stateControls}>
-        {this.renderByState()}
-      </IntlStartup>
+      (!meetingExisted && !meetingExist && Auth.loggedIn)
+        ? <LoadingScreen />
+        : (
+          <IntlStartup locale={locale} baseControls={stateControls}>
+            {this.renderByState()}
+          </IntlStartup>
+        )
     );
   }
 }
@@ -118,33 +219,37 @@ Base.defaultProps = defaultProps;
 
 const SUBSCRIPTIONS_NAME = [
   'users', 'meetings', 'polls', 'presentations',
-  'slides', 'captions', 'breakouts', 'voiceUsers', 'whiteboard-multi-user', 'screenshare',
-  'group-chat', 'presentation-pods',
+  'slides', 'captions', 'voiceUsers', 'whiteboard-multi-user', 'screenshare',
+  'group-chat', 'presentation-pods', 'users-settings', 'guestUser', 'users-infos',
 ];
 
-const BaseContainer = withRouter(withTracker(({ params, router }) => {
-  if (params.errorCode) return params;
-
-  const { locale } = Settings.application;
+const BaseContainer = withTracker(() => {
+  const { locale, animations } = Settings.application;
   const { credentials, loggedIn } = Auth;
   const { meetingId, requesterUserId } = credentials;
+  let breakoutRoomSubscriptionHandler;
+  let meetingModeratorSubscriptionHandler;
 
-  if (!loggedIn) {
-    return {
-      locale,
-      subscriptionsReady: false,
-    };
+  const meeting = Meetings.findOne({ meetingId });
+  if (meeting) {
+    const { meetingEnded } = meeting;
+    if (meetingEnded) Session.set('codeError', '410');
   }
+
+  let userSubscriptionHandler;
 
   const subscriptionErrorHandler = {
     onError: (error) => {
-      logger.error(error);
-      return router.push('/logout');
+      logger.error({ logCode: 'startup_client_subscription_error' }, error);
+      Session.set('codeError', error.error);
     },
   };
 
-  const subscriptionsHandlers = SUBSCRIPTIONS_NAME.map(name =>
-    Meteor.subscribe(name, credentials, subscriptionErrorHandler));
+  const subscriptionsHandlers = SUBSCRIPTIONS_NAME
+    .map(name => Meteor.subscribe(name, credentials, subscriptionErrorHandler));
+
+  const subscriptionsReady = subscriptionsHandlers.every(handler => handler.ready())
+    && loggedIn;
 
   const chats = GroupChat.find({
     $or: [
@@ -160,11 +265,30 @@ const BaseContainer = withRouter(withTracker(({ params, router }) => {
   const chatIds = chats.map(chat => chat.chatId);
 
   const groupChatMessageHandler = Meteor.subscribe('group-chat-msg', credentials, chatIds, subscriptionErrorHandler);
+  const User = Users.findOne({ intId: credentials.requesterUserId });
+  let responseDelay;
+  let inactivityCheck;
+
+  if (User) {
+    const {
+      responseDelay: userResponseDelay,
+      inactivityCheck: userInactivityCheck,
+    } = User;
+    responseDelay = userResponseDelay;
+    inactivityCheck = userInactivityCheck;
+    const mappedUser = mapUser(User);
+    // override meteor subscription to verify if is moderator
+    userSubscriptionHandler = Meteor.subscribe('users', credentials, mappedUser.isModerator, subscriptionErrorHandler);
+    breakoutRoomSubscriptionHandler = Meteor.subscribe('breakouts', credentials, mappedUser.isModerator, subscriptionErrorHandler);
+    meetingModeratorSubscriptionHandler = Meteor.subscribe('meetings', credentials, mappedUser.isModerator, subscriptionErrorHandler);
+
+  }
 
   const annotationsHandler = Meteor.subscribe('annotations', credentials, {
     onReady: () => {
-      AnnotationsLocal.remove({});
-      Annotations.find({}, { reactive: false }).forEach((a) => {
+      const activeTextShapeId = AnnotationsTextService.activeTextShapeId();
+      AnnotationsLocal.remove({ id: { $ne: `${activeTextShapeId}-fake` } });
+      Annotations.find({ id: { $ne: activeTextShapeId } }, { reactive: false }).forEach((a) => {
         try {
           AnnotationsLocal.insert(a);
         } catch (e) {
@@ -176,14 +300,74 @@ const BaseContainer = withRouter(withTracker(({ params, router }) => {
     ...subscriptionErrorHandler,
   });
 
-  const subscriptionsReady = subscriptionsHandlers.every(handler => handler.ready());
+  Breakouts.find().observeChanges({
+    added() {
+      breakoutNotified = false;
+    },
+    removed() {
+      if (!AudioService.isUsingAudio() && !breakoutNotified) {
+        if (meeting && !meeting.meetingEnded) {
+          notify(
+            <FormattedMessage
+              id="app.toast.breakoutRoomEnded"
+              description="message when the breakout room is ended"
+            />,
+            'info',
+            'rooms',
+          );
+        }
+        breakoutNotified = true;
+      }
+    },
+  });
+
+  Meetings.find({ meetingId }).observe({
+    changed: (newDocument, oldDocument) => {
+      if (newDocument.recordProp) {
+        if (!oldDocument.recordProp.recording && newDocument.recordProp.recording) {
+          notify(
+            <FormattedMessage
+              id="app.notification.recordingStart"
+              description="Notification for when the recording starts"
+            />,
+            'success',
+            'record',
+          );
+        }
+
+        if (oldDocument.recordProp.recording && !newDocument.recordProp.recording) {
+          notify(
+            <FormattedMessage
+              id="app.notification.recordingStop"
+              description="Notification for when the recording stops"
+            />,
+            'error',
+            'record',
+          );
+        }
+      }
+    },
+  });
+
   return {
     approved: Users.findOne({ userId: Auth.userID, approved: true, guest: true }),
+    ejected: Users.findOne({ userId: Auth.userID, ejected: true }),
     locale,
     subscriptionsReady,
     annotationsHandler,
     groupChatMessageHandler,
+    userSubscriptionHandler,
+    breakoutRoomSubscriptionHandler,
+    meetingModeratorSubscriptionHandler,
+    animations,
+    responseDelay,
+    inactivityCheck,
+    User,
+    meteorIsConnected: Meteor.status().connected,
+    meetingExist: !!meeting,
+    meetingHasEnded: !!meeting && meeting.meetingEnded,
+    meetingIsBreakout: AppService.meetingIsBreakout(),
   };
-})(Base));
+})(Base);
 
 export default BaseContainer;

@@ -1,34 +1,27 @@
 import BaseAudioBridge from './base';
 import Auth from '/imports/ui/services/auth';
-import Users from '/imports/api/users';
 import { fetchWebRTCMappedStunTurnServers } from '/imports/utils/fetchStunTurnServers';
 import logger from '/imports/startup/client/logger';
 
 const SFU_URL = Meteor.settings.public.kurento.wsUrl;
 const MEDIA = Meteor.settings.public.media;
 const MEDIA_TAG = MEDIA.mediaTag.replace(/#/g, '');
-const GLOBAL_AUDIO_PREFIX = 'GLOBAL_AUDIO_'
-
-const getUserId = () => Auth.userID;
-const getUsername = () => Users.findOne({ userId: getUserId() }).name;
+const GLOBAL_AUDIO_PREFIX = 'GLOBAL_AUDIO_';
 
 const logFunc = (type, message, options) => {
-  const userId = getUserId();
-  const userName = getUsername();
-
   const topic = options.topic || 'audio';
 
-  logger[type]({obj: Object.assign(options, {userId, userName, topic})}, `[${topic}] ${message}`);
+  logger[type](`[${topic}] ${JSON.stringify(message)} options:${JSON.stringify(options)}`);
 };
 
 const modLogger = {
-  info: function (message, options = {}) {
-    logFunc('info', message, options);
+  info(message, options = {}) {
+    if (message.id !== 'ping' && options.message && options.message.id !== 'ping') logFunc('info', message, options);
   },
-  error: function (message, options = {}) {
+  error(message, options = {}) {
     logFunc('error', message, options);
   },
-  debug: function (message, options = {}) {
+  debug(message, options = {}) {
     logFunc('debug', message, options);
   },
   warn: (message, options = {}) => {
@@ -50,7 +43,7 @@ export default class KurentoAudioBridge extends BaseAudioBridge {
     this.user = {
       userId,
       name: username,
-      sessionToken
+      sessionToken,
     };
 
     this.media = {
@@ -60,10 +53,6 @@ export default class KurentoAudioBridge extends BaseAudioBridge {
 
     this.internalMeetingID = meetingId;
     this.voiceBridge = voiceBridge;
-  }
-
-  exitAudio(listenOnly) {
-    window.kurentoExitAudio();
   }
 
   joinAudio({ isListenOnly, inputStream }, callback) {
@@ -76,9 +65,9 @@ export default class KurentoAudioBridge extends BaseAudioBridge {
       } catch (error) {
         logFunc('error', 'SFU audio bridge failed to fetch STUN/TURN info, using default');
       } finally {
-        logFunc('info', "iceServers", iceServers);
+        logFunc('info', 'iceServers', iceServers);
         const options = {
-          wsUrl: SFU_URL,
+          wsUrl: Auth.authenticateURL(SFU_URL),
           userName: this.user.name,
           caleeName: `${GLOBAL_AUDIO_PREFIX}${this.voiceBridge}`,
           iceServers,
@@ -86,21 +75,32 @@ export default class KurentoAudioBridge extends BaseAudioBridge {
           inputStream,
         };
 
-        const onSuccess = ack => resolve(this.callback({ status: this.baseCallStates.started }));
+        const onSuccess = () => {
+          const { webRtcPeer } = window.kurentoManager.kurentoAudio;
+          if (webRtcPeer) {
+            const audioTag = document.getElementById(MEDIA_TAG);
+            const stream = webRtcPeer.getRemoteStream();
+            audioTag.pause();
+            audioTag.srcObject = stream;
+            audioTag.muted = false;
+            audioTag.play();
+          }
+          resolve(this.callback({ status: this.baseCallStates.started }));
+        };
 
-        const onFail = error => {
+        const onFail = (error) => {
           const { reason } = error;
           this.callback({
             status: this.baseCallStates.failed,
             error: this.baseErrorCodes.CONNECTION_ERROR,
             bridgeError: reason,
-          })
+          });
 
           reject(reason);
         };
 
         if (!isListenOnly) {
-          return reject("Invalid bridge option");
+          return reject('Invalid bridge option');
         }
 
         window.kurentoJoinAudio(
@@ -110,20 +110,20 @@ export default class KurentoAudioBridge extends BaseAudioBridge {
           this.internalMeetingID,
           onFail,
           onSuccess,
-          options
+          options,
         );
       }
     });
   }
 
   async changeOutputDevice(value) {
-    const audioContext = document.querySelector('#'+MEDIA_TAG);
+    const audioContext = document.querySelector(`#${MEDIA_TAG}`);
     if (audioContext.setSinkId) {
       try {
         await audioContext.setSinkId(value);
         this.media.outputDeviceId = value;
       } catch (err) {
-        logger.error(err);
+        logger.error({ logCode: 'audio_kurento_changeoutputdevice_error' }, err);
         throw new Error(this.baseErrorCodes.MEDIA_ERROR);
       }
     }
@@ -133,7 +133,7 @@ export default class KurentoAudioBridge extends BaseAudioBridge {
 
 
   exitAudio() {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       window.kurentoExitAudio();
       return resolve(this.callback({ status: this.baseCallStates.ended }));
     });

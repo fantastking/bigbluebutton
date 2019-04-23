@@ -8,11 +8,11 @@ import Logger from './logger';
 // Fake meetingId used for messages that have no meetingId
 const NO_MEETING_ID = '_';
 
-const makeEnvelope = (channel, eventName, header, body) => {
+const makeEnvelope = (channel, eventName, header, body, routing) => {
   const envelope = {
     envelope: {
       name: eventName,
-      routing: {
+      routing: routing || {
         sender: 'bbb-apps-akka',
         // sender: 'html5-server', // TODO
       },
@@ -28,10 +28,10 @@ const makeEnvelope = (channel, eventName, header, body) => {
 
 const makeDebugger = enabled => (message) => {
   if (!enabled) return;
-  Logger.info(`REDIS: ${message}`);
+  Logger.debug(`REDIS: ${message}`);
 };
 
-class MettingMessageQueue {
+class MeetingMessageQueue {
   constructor(eventEmitter, asyncMessages = [], debug = () => {}) {
     this.asyncMessages = asyncMessages;
     this.emitter = eventEmitter;
@@ -159,17 +159,17 @@ class RedisPubSub {
 
     if (ignoredMessages.includes(channel)
       || ignoredMessages.includes(eventName)) {
+      if (eventName === 'CheckAlivePongSysMsg') {
+        return;
+      }
       this.debug(`${eventName} skipped`);
       return;
     }
 
-    // Please keep this log until the message handling is solid
-    console.warn(` ~~~~ REDIS RECEIVED: ${eventName}  ${message}`);
-
     const queueId = meetingId || NO_MEETING_ID;
 
     if (!(queueId in this.mettingsQueues)) {
-      this.mettingsQueues[meetingId] = new MettingMessageQueue(this.emitter, async, this.debug);
+      this.mettingsQueues[meetingId] = new MeetingMessageQueue(this.emitter, async, this.debug);
     }
 
     this.mettingsQueues[meetingId].add({
@@ -227,10 +227,7 @@ class RedisPubSub {
       userId,
     };
 
-    const envelope = makeEnvelope(channel, eventName, header, payload);
-
-    // Please keep this log until the message handling is solid
-    console.warn(` ~~~~ REDIS PUBLISHING:  ${envelope}`);
+    const envelope = makeEnvelope(channel, eventName, header, payload, { meetingId, userId });
 
     return this.pub.publish(channel, envelope, RedisPubSub.handlePublishError);
   }

@@ -1,18 +1,10 @@
-import React, { Component } from 'react';
+import React, { PureComponent } from 'react';
 import PropTypes from 'prop-types';
-import { withRouter } from 'react-router';
 import { injectIntl } from 'react-intl';
+import _ from 'lodash';
 import UserDropdown from './user-dropdown/component';
 
 const propTypes = {
-  user: PropTypes.shape({
-    name: PropTypes.string.isRequired,
-    isPresenter: PropTypes.bool.isRequired,
-    isVoiceUser: PropTypes.bool.isRequired,
-    isModerator: PropTypes.bool.isRequired,
-    image: PropTypes.string,
-  }).isRequired,
-
   currentUser: PropTypes.shape({
     id: PropTypes.string.isRequired,
   }).isRequired,
@@ -21,66 +13,76 @@ const propTypes = {
   intl: PropTypes.shape({
     formatMessage: PropTypes.func.isRequired,
   }).isRequired,
-  router: PropTypes.shape({}).isRequired,
   isBreakoutRoom: PropTypes.bool,
   getAvailableActions: PropTypes.func.isRequired,
-  meeting: PropTypes.shape({}).isRequired,
   isMeetingLocked: PropTypes.func.isRequired,
   normalizeEmojiName: PropTypes.func.isRequired,
   getScrollContainerRef: PropTypes.func.isRequired,
+  toggleUserLock: PropTypes.func.isRequired,
 };
 
 const defaultProps = {
   isBreakoutRoom: false,
 };
 
-class UserListItem extends Component {
+class UserListItem extends PureComponent {
   render() {
     const {
-      compact,
       user,
-      intl,
-      meeting,
-      isMeetingLocked,
-      normalizeEmojiName,
-      getScrollContainerRef,
       assignPresenter,
-      removeUser,
-      toggleVoice,
-      changeRole,
-      setEmojiStatus,
+      compact,
       currentUser,
-      router,
-      isBreakoutRoom,
+      changeRole,
       getAvailableActions,
-      handleEmojiChange,
-      getEmojiList,
       getEmoji,
+      getEmojiList,
+      getGroupChatPrivate,
+      getScrollContainerRef,
+      handleEmojiChange,
+      intl,
+      isBreakoutRoom,
+      isMeetingLocked,
+      meeting,
+      normalizeEmojiName,
+      removeUser,
+      setEmojiStatus,
+      toggleVoice,
+      hasPrivateChatBetweenUsers,
+      toggleUserLock,
+      requestUserInformation,
     } = this.props;
 
-    const contents = (<UserDropdown
-      {...{
-        compact,
-        user,
-        intl,
-        normalizeEmojiName,
-        meeting,
-        isMeetingLocked,
-        getScrollContainerRef,
-        assignPresenter,
-        removeUser,
-        toggleVoice,
-        changeRole,
-        setEmojiStatus,
-        currentUser,
-        router,
-        isBreakoutRoom,
-        getAvailableActions,
-        handleEmojiChange,
-        getEmojiList,
-        getEmoji,
-      }}
-    />);
+    const { meetingId, lockSettingsProp } = meeting;
+
+    const contents = (
+      <UserDropdown
+        {...{
+          assignPresenter,
+          compact,
+          currentUser,
+          changeRole,
+          getAvailableActions,
+          getEmoji,
+          getEmojiList,
+          getGroupChatPrivate,
+          getScrollContainerRef,
+          handleEmojiChange,
+          intl,
+          isBreakoutRoom,
+          isMeetingLocked,
+          meetingId,
+          lockSettingsProp,
+          normalizeEmojiName,
+          removeUser,
+          setEmojiStatus,
+          toggleVoice,
+          user,
+          hasPrivateChatBetweenUsers,
+          toggleUserLock,
+          requestUserInformation,
+        }}
+      />
+    );
 
     return contents;
   }
@@ -89,4 +91,4 @@ class UserListItem extends Component {
 UserListItem.propTypes = propTypes;
 UserListItem.defaultProps = defaultProps;
 
-export default withRouter(injectIntl(UserListItem));
+export default injectIntl(UserListItem);

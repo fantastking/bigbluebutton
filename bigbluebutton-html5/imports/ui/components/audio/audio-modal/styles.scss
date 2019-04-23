@@ -1,6 +1,10 @@
 @import "/imports/ui/stylesheets/variables/_all";
 @import "/imports/ui/components/modal/simple/styles";
 
+:root {
+ --audioDial-margin-left: 2rem;
+}
+
 .header {
   margin: 0;
   padding: 0;
@@ -33,6 +37,14 @@
   margin-top: auto;
   margin-bottom: auto;
   display: flex;
+  justify-content: center;
+}
+
+.browserWarning {
+  padding: 0.5rem;
+  border-width: 3px;
+  border-style: solid;
+  border-radius: 0.25rem;
 }
 
 .overlay {
@@ -47,44 +59,47 @@
 
 .closeBtn {
   position: relative;
-  background-color: $color-white;
+  background-color: var(--color-white);
 
   i {
-    color: $color-gray-light;
+    color: var(--color-gray-light);
   }
 
   &:focus,
-  &:hover{
-    background-color: $color-gray-lighter;
-    i{
-      color: $color-gray;
+  &:hover {
+    background-color: var(--color-gray-lighter);
+    i {
+      color: var(--color-gray);
     }
   }
 }
-.warning{
+.warning {
   text-align: center;
-  font-weight: $headings-font-weight;
+  font-weight: var(--headings-font-weight);
   font-size: 5rem;
   white-space: normal;
 }
-.text{
-  margin: $line-height-computed;
+.text {
+  margin: var(--line-height-computed);
   text-align: center;
 }
 
-.main{
-  margin: $line-height-computed;
+.main {
+  margin: var(--line-height-computed);
   text-align: center;
-  font-size: $font-size-large;
+  font-size: var(--font-size-large);
 }
+
 .audioBtn {
-  &:focus {
-    outline: none !important;
-  }
-
-  i{
+  i {
     color: #3c5764;
   }
+}
+
+.audioDial {
+  margin: 0 auto;
+  margin-top: var(--md-padding-y);
+  display: block;
 }
 
 // Modifies the audio button icon colour
@@ -103,7 +118,7 @@
 // When hovering over a button of class audioBtn, change the border colour of first span-child
 .audioBtn:hover span:first-child,
 .audioBtn:focus span:first-child {
-  border: 5px solid $color-primary;
+  border: 5px solid var(--color-primary);
   background-color: #f1f8ff;
 }
 
@@ -118,6 +133,7 @@
   text-align: center;
   font-weight: 400;
   font-size: 1.3rem;
+  color: var(--color-background);
   white-space: normal;
 
   @include mq($small-only) {
@@ -132,15 +148,18 @@
   font-size: 2rem;
 }
 
-.connectingAnimation{
+.connectingAnimation {
   &:after {
     overflow: hidden;
     display: inline-block;
     vertical-align: bottom;
-    animation: ellipsis steps(4,end) 900ms infinite;
     content: "\2026"; /* ascii code for the ellipsis character */
     width: 0;
     margin-right: 1.25em;
+
+    :global(.animationsEnabled) & {
+      animation: ellipsis steps(4,end) 900ms infinite;
+    }
   }
 }
 
@@ -152,7 +171,7 @@
 }
 
 .audioNote {
-  color: $color-text;
+  color: var(--color-text);
   display: inline-block;
   font-size: 0.9rem;
 }
